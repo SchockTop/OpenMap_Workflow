@@ -1,0 +1,6 @@
+[submodule "OpenMap_Unifier"]
+	path = OpenMap_Unifier
+	url = file:///G:/Privat/Projekte/Work/OpenMap_Unifier
+[submodule "openmap_blender_tools"]
+	path = openmap_blender_tools
+	url = file:///G:/Privat/Projekte/Work/openmap_blender_tools
