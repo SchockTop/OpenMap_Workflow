@@ -60,8 +60,11 @@ for obj in bpy.data.objects:
             m_info["texture"] = m.texture.name if m.texture else None
         o["modifiers"].append(m_info)
     if obj.type == "MESH":
-        o["vert_count"] = len(obj.data.vertices)
-        o["face_count"] = len(obj.data.polygons)
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        eval_obj = obj.evaluated_get(depsgraph)
+        o["vert_count"] = len(eval_obj.data.vertices)
+        o["face_count"] = len(eval_obj.data.polygons)
+        o["base_vert_count"] = len(obj.data.vertices)  # for debug
         o["material_slots"] = [s.material.name if s.material else None for s in obj.material_slots]
     if obj.type == "CAMERA":
         o["camera"] = {
