@@ -49,8 +49,19 @@ def render(out_path):
 
 out_dir = Path(args.out_dir)
 
+def _maybe_add_terrain_plane():
+    """For features that need a terrain (ground-shader), add a plane both runs."""
+    if args.feature == "ground-shader":
+        bpy.ops.mesh.primitive_plane_add(size=100, location=(0, 0, 0))
+        plane = bpy.context.active_object
+        plane.name = "TerrainPlane"
+        return plane
+    return None
+
+
 # Render 1: baseline (no feature).
 cube = build_synthetic_scene()
+_maybe_add_terrain_plane()
 render(out_dir / "baseline")  # Blender appends .png
 
 # Render 2: with feature.
@@ -59,6 +70,13 @@ context = {"bpy": bpy, "scene": bpy.context.scene,
            "terrain_obj": None, "dop_image": None, "ortho_dir": None,
            "building_objs": [cube], "bbox_utm32n": (-100, -100, 100, 100),
            "anchor_utm32n": (0, 0, 0), "args": args}
+
+# Per-feature scene augmentation: ground-shader needs a terrain plane.
+plane = _maybe_add_terrain_plane()
+if plane is not None:
+    context["terrain_obj"] = plane
+    context["building_objs"] = []
+
 features_mod.apply_enabled([args.feature], context)
 render(out_dir / "applied")
 
