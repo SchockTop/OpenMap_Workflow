@@ -51,7 +51,7 @@ out_dir = Path(args.out_dir)
 
 def _maybe_add_terrain_plane():
     """For features that need a terrain (ground-shader), add a plane both runs."""
-    if args.feature == "ground-shader":
+    if args.feature in ("ground-shader", "groundcover"):
         bpy.ops.mesh.primitive_plane_add(size=100, location=(0, 0, 0))
         plane = bpy.context.active_object
         plane.name = "TerrainPlane"
