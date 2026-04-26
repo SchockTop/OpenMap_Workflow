@@ -1,6 +1,6 @@
 [submodule "OpenMap_Unifier"]
 	path = OpenMap_Unifier
-	url = file:///G:/Privat/Projekte/Work/OpenMap_Unifier
+	url = https://github.com/Kleinschock/OpenMap_Unifier.git
 [submodule "openmap_blender_tools"]
 	path = openmap_blender_tools
-	url = file:///G:/Privat/Projekte/Work/openmap_blender_tools
+	url = https://github.com/SchockTop/openmap_blender_tools.git
