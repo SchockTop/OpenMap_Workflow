@@ -11,19 +11,30 @@ OpenMap_Workflow/
   data/                   downloaded raw tiles + processed outputs (gitignored)
 ```
 
-## Quickstart
+## Quickstart — one command
 
 ```bash
-git clone --recurse-submodules <umbrella-url>
+git clone --recurse-submodules https://github.com/SchockTop/OpenMap_Workflow.git
 cd OpenMap_Workflow
 
-# 1. Download a Marienplatz test tile (DOP20 works; see "Known issues" below)
-python workflows/download_munich_test_tile.py
-
-# 2. Build a Blender scene from the downloaded tiles
+# 1. Install + enable Blender extension (one-time):
 "C:/Program Files/Blender Foundation/Blender 5.1/blender.exe" \
-  --background --python workflows/tile_to_blender_scene.py
+  --command extension install-file --repo user_default --enable \
+  openmap_blender_tools/dist/blender_tools-0.1.0.zip
+
+# 2. Run end-to-end (downloads ~700 MB, takes ~10–15 min):
+python workflows/full_pipeline.py --region muc-sued-4x2 \
+    --datasets dgm1 dop40 lod2 --render-preview
+# -> data/scene_muc-sued-4x2.blend  + data/render_muc-sued-4x2.png
+
+# OR: open Blender, hit N-panel "OpenMap" -> "Build cinematic scene from region"
 ```
+
+**Available regions:** `muc-marienplatz-50m` (1 tile, ~30 s), `muc-sued-4x2` (~10 min),
+`muc-sued-10x4` (cinematic 10×4 km baseline, ~30 min, ~3 GB).
+
+**Available datasets:** `dgm1` (1m heightmap), `dop20` / `dop40` (orthophoto, 40 cm = 4× smaller),
+`lod2` (CityGML 3D buildings).
 
 ## Known issues
 
