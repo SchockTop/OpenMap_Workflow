@@ -119,7 +119,9 @@ def phase5_blender(heightmap: Path,
                    bbox_utm32n: tuple[float, float, float, float],
                    out_blend: Path,
                    render_png: Optional[Path],
-                   engine: str = "BLENDER_EEVEE_NEXT") -> int:
+                   engine: str = "BLENDER_EEVEE_NEXT",
+                   enable: Optional[list[str]] = None,
+                   camera_preset: str = "cinematic-establishing") -> int:
     blender_script = ROOT / "workflows" / "_blender_assemble_full.py"
     cmd = [
         str(BLENDER), "--background", "--python", str(blender_script), "--",
@@ -128,6 +130,7 @@ def phase5_blender(heightmap: Path,
         "--out-blend", str(out_blend),
         "--engine", engine,
         "--waypoints-csv", str(waypoints_csv),
+        "--camera-preset", camera_preset,
     ]
     if ortho_dir:
         cmd += ["--ortho-dir", str(ortho_dir)]
@@ -135,6 +138,8 @@ def phase5_blender(heightmap: Path,
         cmd += ["--cityjson", str(cityjson)]
     if render_png:
         cmd += ["--render-png", str(render_png)]
+    if enable:
+        cmd += ["--enable", *enable]
     print(f"[5] Blender -> {out_blend}")
     return subprocess.call(cmd)
 
@@ -154,7 +159,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--region", required=True, help="Named region from region_presets.")
     ap.add_argument("--datasets", nargs="+", default=["dgm1", "dop40", "lod2"])
     ap.add_argument("--engine", default="BLENDER_EEVEE_NEXT")
+    ap.add_argument("--camera-preset", default="cinematic-establishing",
+                    choices=["fpv-walk", "fpv-bike", "low-drone", "mid-drone",
+                             "cinematic-establishing", "aircraft-approach"],
+                    help="Camera altitude envelope")
     ap.add_argument("--render-preview", action="store_true")
+    ap.add_argument("--enable", nargs="*", default=[],
+                    help="Feature modules to apply (e.g. buildings-textured trees)")
     ap.add_argument("--data-dir", type=Path, default=ROOT / "data")
     args = ap.parse_args(argv)
 
@@ -176,7 +187,9 @@ def main(argv: list[str] | None = None) -> int:
     out_blend = args.data_dir / f"scene_{args.region}.blend"
     render_png = args.data_dir / f"render_{args.region}.png" if args.render_preview else None
     return phase5_blender(heightmap, ortho_dir, cityjson, waypoints, bbox,
-                          out_blend, render_png, engine=args.engine)
+                          out_blend, render_png, engine=args.engine,
+                          enable=args.enable,
+                          camera_preset=args.camera_preset)
 
 
 if __name__ == "__main__":
