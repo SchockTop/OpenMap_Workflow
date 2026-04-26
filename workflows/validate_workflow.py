@@ -288,6 +288,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--region", default="muc-sued-4x2")
     ap.add_argument("--datasets", nargs="+", default=["dgm1", "dop40", "lod2"])
     ap.add_argument("--data-dir", type=Path, default=ROOT / "data")
+    ap.add_argument("--all-presets", action="store_true",
+                    help="After phase G, also render+verify every camera preset")
     args = ap.parse_args(argv)
 
     from workflows.region_presets import polygon_for_region
@@ -330,6 +332,41 @@ def main(argv: list[str] | None = None) -> int:
     else:
         for n in ("D. Blender scene", "E. Introspection", "F. Render", "G. Readback"):
             results.append(PhaseResult(n).skip("no heightmap"))
+
+    if args.all_presets:
+        p_h = PhaseResult("H. Multi-preset render consistency")
+        try:
+            from workflows.multi_altitude_demo import PRESETS, render_one, make_contact_sheet
+            from PIL import Image
+            import numpy as np
+            scene = args.data_dir / f"scene_{args.region}.blend"
+            if not scene.is_file():
+                results.append(p_h.skip("no scene"))
+            else:
+                ok_count = 0
+                details = {}
+                for preset in PRESETS:
+                    out = args.data_dir / f"render_{args.region}_{preset}.png"
+                    actual = render_one(scene, preset, out)
+                    if actual is None:
+                        details[preset] = "render failed"
+                        continue
+                    arr = np.array(Image.open(actual).convert("RGB"))
+                    std = float(arr.std(axis=(0,1)).max())
+                    if std > 5:
+                        ok_count += 1
+                        details[preset] = f"std={std:.1f} OK"
+                    else:
+                        details[preset] = f"std={std:.1f} BLANK"
+                p_h.evidence["per_preset"] = details
+                p_h.evidence["ok_count"] = f"{ok_count}/{len(PRESETS)}"
+                if ok_count >= len(PRESETS) - 1:
+                    results.append(p_h.ok(**p_h.evidence))
+                else:
+                    results.append(p_h.fail(f"{ok_count}/{len(PRESETS)} succeeded",
+                                           **p_h.evidence))
+        except Exception as e:
+            results.append(p_h.fail(f"{type(e).__name__}: {e}"))
 
     # Phase H: human + machine report.
     print("\n" + "="*70)
