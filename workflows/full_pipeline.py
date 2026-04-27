@@ -131,7 +131,8 @@ def phase5_blender(heightmap: Path,
                    engine: str = "BLENDER_EEVEE_NEXT",
                    enable: Optional[list[str]] = None,
                    camera_preset: str = "cinematic-establishing",
-                   sky_preset: str = "afternoon") -> int:
+                   sky_preset: str = "afternoon",
+                   quality: str = "preview") -> int:
     blender_script = ROOT / "workflows" / "_blender_assemble_full.py"
     cmd = [
         str(BLENDER), "--background", "--python", str(blender_script), "--",
@@ -142,6 +143,7 @@ def phase5_blender(heightmap: Path,
         "--waypoints-csv", str(waypoints_csv),
         "--camera-preset", camera_preset,
         "--sky-preset", sky_preset,
+        "--quality", quality,
     ]
     if ortho_dir:
         cmd += ["--ortho-dir", str(ortho_dir)]
@@ -178,6 +180,9 @@ def main(argv: list[str] | None = None) -> int:
                     choices=["noon", "golden-hour", "blue-hour", "dawn",
                              "overcast", "afternoon"],
                     help="Time-of-day lighting mood")
+    ap.add_argument("--quality", default="preview",
+                    choices=["draft", "preview", "final"],
+                    help="Render quality envelope (resolution + samples + simplify).")
     ap.add_argument("--render-preview", action="store_true")
     ap.add_argument("--enable", nargs="*", default=[],
                     help="Feature modules to apply (e.g. buildings-textured trees)")
@@ -205,7 +210,9 @@ def main(argv: list[str] | None = None) -> int:
     return phase5_blender(heightmap, ortho_dir, cityjson, waypoints, bbox,
                           out_blend, render_png, engine=args.engine,
                           enable=args.enable,
-                          camera_preset=args.camera_preset)
+                          camera_preset=args.camera_preset,
+                          sky_preset=args.sky_preset,
+                          quality=args.quality)
 
 
 if __name__ == "__main__":

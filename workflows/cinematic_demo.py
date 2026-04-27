@@ -23,7 +23,8 @@ SKY_PRESETS = ["noon", "golden-hour", "blue-hour", "dawn", "overcast", "afternoo
 
 
 def run_pipeline(region: str, sky_preset: str, camera_preset: str,
-                 features: list[str], data_dir: Path) -> int:
+                 features: list[str], data_dir: Path,
+                 quality: str = "preview") -> int:
     cmd = [
         "C:/ProgramData/anaconda3/python.exe",
         str(ROOT / "workflows" / "full_pipeline.py"),
@@ -32,6 +33,7 @@ def run_pipeline(region: str, sky_preset: str, camera_preset: str,
         "--enable", *features,
         "--camera-preset", camera_preset,
         "--sky-preset", sky_preset,
+        "--quality", quality,
         "--engine", "BLENDER_EEVEE_NEXT",
         "--render-preview",
         "--data-dir", str(data_dir),
@@ -101,6 +103,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--camera-preset", default="cinematic-establishing")
     ap.add_argument("--features", nargs="*", default=ALL_FEATURES,
                     help="Subset of features to enable (default: all)")
+    ap.add_argument("--quality", default="final",
+                    choices=["draft", "preview", "final"],
+                    help="Render quality envelope (default: final for poster)")
     ap.add_argument("--sky-comparison", action="store_true",
                     help="Also produce a 6-up sky-preset contact sheet")
     ap.add_argument("--data-dir", type=Path, default=ROOT / "data")
@@ -112,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # 1. Pipeline run.
     rc = run_pipeline(args.region, args.sky_preset, args.camera_preset,
-                      args.features, args.data_dir)
+                      args.features, args.data_dir, quality=args.quality)
     if rc != 0:
         print(f"[demo] pipeline FAILED (exit {rc})", file=sys.stderr)
         return rc

@@ -26,6 +26,9 @@ ap.add_argument("--camera-preset", default="cinematic-establishing",
 ap.add_argument("--sky-preset", default="afternoon",
                 choices=["noon", "golden-hour", "blue-hour", "dawn", "overcast", "afternoon"],
                 help="Named time-of-day lighting mood from sky_presets.SKY_PRESETS")
+ap.add_argument("--quality", default="preview",
+                choices=["draft", "preview", "final"],
+                help="Render quality envelope (resolution + samples + simplify caps).")
 args = ap.parse_args(argv)
 
 ext = importlib.import_module("bl_ext.user_default.blender_tools")
@@ -43,6 +46,7 @@ citygml_import      = importlib.import_module("bl_ext.user_default.blender_tools
 waypoints_to_camera = importlib.import_module("bl_ext.user_default.blender_tools.waypoints_to_camera")
 cinematic_preset    = importlib.import_module("bl_ext.user_default.blender_tools.cinematic_preset")
 camera_presets      = importlib.import_module("bl_ext.user_default.blender_tools.camera_presets")
+quality_presets     = importlib.import_module("bl_ext.user_default.blender_tools.quality_presets")
 
 # 1. Sky + atmosphere domain cube.
 xmin, ymin, xmax, ymax = args.bbox_utm32n
@@ -99,9 +103,11 @@ if args.waypoints_csv and Path(args.waypoints_csv).is_file():
     )
     print(f"[blender] camera preset applied: {args.camera_preset}")
 
-# 6. Cinematic preset.
-cinematic_preset.apply_cinematic_preset(bpy.context.scene, render_engine=args.engine)
-print(f"[blender] preset applied (engine={args.engine})")
+# 6. Cinematic preset (quality preset is applied AFTER cinematic so it wins).
+cinematic_preset.apply_cinematic_preset(
+    bpy.context.scene, render_engine=args.engine, quality=args.quality,
+)
+print(f"[blender] preset applied (engine={args.engine}, quality={args.quality})")
 
 # 6a. Sky / time-of-day mood preset (overrides cinematic_preset's sun defaults).
 sky_presets = importlib.import_module("bl_ext.user_default.blender_tools.sky_presets")
@@ -109,7 +115,13 @@ sky_presets.apply_sky_preset(bpy.context.scene, args.sky_preset)
 print(f"[blender] sky preset applied: {args.sky_preset}")
 
 # 6b. Feature-registry hook: apply optional plug-in features.
-if args.enable:
+# Honour quality preset's skip_features (e.g. drop "groundcover" at draft).
+skip = set(quality_presets.QUALITY_PRESETS.get(args.quality, {}).get("skip_features", []))
+enabled_features = [f for f in args.enable if f not in skip]
+if skip and args.enable != enabled_features:
+    dropped = [f for f in args.enable if f in skip]
+    print(f"[blender] quality={args.quality} skipping features: {dropped}")
+if enabled_features:
     features_mod = importlib.import_module(
         "bl_ext.user_default.blender_tools.features"
     )
@@ -124,7 +136,7 @@ if args.enable:
         "anchor_utm32n": anchor,
         "args": args,
     }
-    features_mod.apply_enabled(args.enable, feat_context)
+    features_mod.apply_enabled(enabled_features, feat_context)
 
 bpy.ops.wm.save_as_mainfile(filepath=args.out_blend)
 print(f"[blender] saved scene: {args.out_blend}")
