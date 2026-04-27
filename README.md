@@ -1,7 +1,40 @@
 # OpenMap_Workflow
 
 Umbrella repo that wires Bayern OpenData (DGM/DOP/LoD2) through a Blender
-pipeline for terrain + cinematic renders. Two submodules:
+pipeline for terrain + cinematic renders.
+
+## Showcase
+
+**Headline poster** — 1920×1080, golden-hour, München-Süd 4×2 km corridor with
+27 730 LoD2 buildings + procedural trees + multi-layer ground shader:
+
+![Headline Poster](showcase/01_poster.png)
+
+**Sky envelope** — same scene at 6 named time-of-day presets
+(noon · golden-hour · blue-hour · dawn · overcast · afternoon).
+Inter-cell color distance: **290** (3× the spec threshold for "dramatic mood difference"):
+
+![Sky Comparison](showcase/02_sky_comparison.png)
+
+**Camera altitude envelope** — same scene through 6 named camera presets
+(fpv-walk 1.7 m · fpv-bike 1.7 m · low-drone 80 m · mid-drone 500 m ·
+cinematic-establishing 2 000 m · aircraft-approach 4 500 m).
+Inter-cell color distance: **222**:
+
+![Altitude Comparison](showcase/03_altitude_comparison.png)
+
+**Per-feature isolation tests** — each plug-in feature renders an A/B against
+a baseline cube building / plane to prove the feature applied:
+
+| Buildings textured | Trees | Ground shader | Groundcover |
+|:---:|:---:|:---:|:---:|
+| ![Buildings](showcase/04_feature_buildings.png) | ![Trees](showcase/05_feature_trees.png) | ![Ground shader](showcase/06_feature_ground_shader.png) | ![Groundcover](showcase/07_feature_groundcover.png) |
+
+---
+
+## Architecture
+
+Two submodules:
 
 ```
 OpenMap_Workflow/
