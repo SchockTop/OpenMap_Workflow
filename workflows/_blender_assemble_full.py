@@ -52,8 +52,13 @@ quality_presets     = importlib.import_module("bl_ext.user_default.blender_tools
 xmin, ymin, xmax, ymax = args.bbox_utm32n
 size_x, size_y = xmax - xmin, ymax - ymin
 bpy.ops.blender_tools.setup_sky(preset="client-default")
+# Atmospheric haze — keep cube SHORT so cameras above ~150m AGL see through it.
+# Previously the cube was up to 534 m tall, which made the volumetric scatter
+# blot out the terrain for any aerial-altitude camera (the entire frame went
+# blue). Now: 80 m thick band of haze at ground level only — visible from
+# FPV/low-drone, gone for higher altitudes.
 bpy.ops.blender_tools.add_domain_cube(
-    bbox=(size_x, size_y, max(300.0, size_y / 4)),
+    bbox=(size_x, size_y, 80.0),
     preset="airbus-clean",
 )
 
