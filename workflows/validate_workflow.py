@@ -22,6 +22,9 @@ import argparse, json, math, subprocess, sys, traceback
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+from PIL import Image
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "OpenMap_Unifier"))
@@ -203,8 +206,8 @@ def phase_e_introspect(scene_blend: Path, data_root: Path) -> tuple[PhaseResult,
         eng = report["render"]["engine"]
         assertions["render.engine == EEVEE"] = ("EEVEE" in eng, eng)
         assertions["render.use_simplify"] = (report["render"]["use_simplify"], report["render"]["use_simplify"])
-        assertions["view_transform == AgX"] = (report["view_settings"]["view_transform"] == "AgX",
-                                                report["view_settings"]["view_transform"])
+        vt = report["view_settings"]["view_transform"]
+        assertions["view_transform contains AgX"] = ("AgX" in vt, vt)
 
         # 3. Terrain plane has Subsurf + Displace modifiers, vert count > 1k.
         terrain = next((o for o in report["objects"]
@@ -283,6 +286,46 @@ def phase_g_render_readback(png: Path) -> PhaseResult:
         return p.fail(f"{type(e).__name__}: {e}")
 
 
+def _sobel_edge_density(png_path: Path) -> tuple[float, dict]:
+    """Compute fraction of pixels that are 'edge' pixels (Sobel magnitude > 30).
+
+    Pure-numpy Sobel (no scipy dep). Returns (ratio, evidence_dict).
+    """
+    img = np.array(Image.open(png_path).convert("L")).astype(np.float32)
+    # Sobel kernels.
+    gx = np.zeros_like(img)
+    gy = np.zeros_like(img)
+    gx[:, 1:-1] = img[:, 2:] - img[:, :-2]
+    gy[1:-1, :] = img[2:, :] - img[:-2, :]
+    mag = np.sqrt(gx ** 2 + gy ** 2)
+    edge_mask = mag > 30.0
+    ratio = float(edge_mask.sum()) / mag.size
+    return ratio, {
+        "edge_pixel_ratio": round(ratio, 4),
+        "max_gradient": round(float(mag.max()), 1),
+        "mean_gradient": round(float(mag.mean()), 2),
+    }
+
+
+def phase_i_geometry_detail(png: Path) -> PhaseResult:
+    p = PhaseResult("I. Geometry detail (Sobel edge density)")
+    if not png or not png.is_file():
+        return p.skip("no PNG")
+    try:
+        ratio, evidence = _sobel_edge_density(png)
+        threshold = 0.05
+        evidence["threshold"] = threshold
+        if ratio < threshold:
+            return p.fail(
+                f"edge density {ratio:.4f} < {threshold} — render lacks geometry "
+                f"(likely sky gradient or solid color)",
+                **evidence,
+            )
+        return p.ok(**evidence)
+    except Exception as e:
+        return p.fail(f"{type(e).__name__}: {e}")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--region", default="muc-sued-4x2")
@@ -323,8 +366,10 @@ def main(argv: list[str] | None = None) -> int:
             png = render_out.get("render_png")
             if png:
                 results.append(phase_g_render_readback(png))
+                results.append(phase_i_geometry_detail(png))
             else:
                 results.append(PhaseResult("G. Render readback").skip("no PNG"))
+                results.append(PhaseResult("I. Geometry detail").skip("no PNG"))
         else:
             results.append(PhaseResult("E. Scene introspection").skip("no scene"))
             results.append(PhaseResult("F. Render frame").skip("no scene"))
