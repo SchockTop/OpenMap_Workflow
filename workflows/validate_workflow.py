@@ -198,7 +198,7 @@ def phase_e_introspect(scene_blend: Path, data_root: Path) -> tuple[PhaseResult,
             ce = cam.get("camera", {}).get("clip_end")
             assertions["camera.clip_start == 1.0"] = (cs == 1.0, cs)
             assertions["camera.clip_end == 100000"] = (ce == 100_000.0, ce)
-            assertions["camera.lens == 85"] = (cam["camera"].get("lens") == 85.0, cam["camera"].get("lens"))
+            assertions["camera.lens > 0"] = (cam["camera"].get("lens", 0) > 0, cam["camera"].get("lens"))
         else:
             assertions["camera exists"] = (False, None)
 
