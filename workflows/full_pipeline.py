@@ -91,24 +91,33 @@ def phase3_lod2(downloads: dict[str, list[Path]], out_root: Path) -> Optional[Pa
 
 def phase4_synthetic_waypoints(bbox: tuple[float, float, float, float],
                                out: Path,
-                               altitude_agl_m: float = 1500.0,
-                               n_points: int = 30) -> Path:
-    """Generate a 30-waypoint S-curve across the bbox at constant altitude."""
+                               preset_name: str = "cinematic-establishing") -> Path:
+    """Generate waypoints appropriate for the given camera preset.
+
+    Dispatches via blender_tools.waypoint_generators; falls back to a generic
+    S-curve at 1500 m AGL if the dispatcher import fails.
+    """
     out.parent.mkdir(parents=True, exist_ok=True)
-    from pyproj import Transformer
-    t = Transformer.from_crs("EPSG:25832", "EPSG:4326", always_xy=True)
-    xmin, ymin, xmax, ymax = bbox
+    try:
+        from blender_tools.waypoint_generators import generate_waypoints_for_preset
+        pts = generate_waypoints_for_preset(preset_name, bbox)
+    except Exception as e:
+        print(f"[4] preset waypoint gen failed ({e}); falling back to S-curve")
+        from pyproj import Transformer
+        t = Transformer.from_crs("EPSG:25832", "EPSG:4326", always_xy=True)
+        pts = []
+        for i in range(30):
+            frac = i / 29
+            x = bbox[0] + (bbox[2] - bbox[0]) * frac
+            y = bbox[1] + (bbox[3] - bbox[1]) * (0.5 + 0.4 * math.sin(frac * math.pi * 2))
+            lon, lat = t.transform(x, y)
+            pts.append((lat, lon, 1500.0))
     with out.open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["lat", "lon", "alt"])
-        for i in range(n_points):
-            frac = i / (n_points - 1)
-            x = xmin + (xmax - xmin) * frac
-            # Sinusoidal Y so the path isn't a boring straight line.
-            y = ymin + (ymax - ymin) * (0.5 + 0.4 * math.sin(frac * math.pi * 2))
-            lon, lat = t.transform(x, y)
-            w.writerow([f"{lat:.6f}", f"{lon:.6f}", altitude_agl_m])
-    print(f"[4] waypoints: {out} ({n_points} points)")
+        for p in pts:
+            w.writerow([f"{p[0]:.6f}", f"{p[1]:.6f}", p[2]])
+    print(f"[4] waypoints: {out} ({len(pts)} points, preset={preset_name!r})")
     return out
 
 
@@ -121,7 +130,8 @@ def phase5_blender(heightmap: Path,
                    render_png: Optional[Path],
                    engine: str = "BLENDER_EEVEE_NEXT",
                    enable: Optional[list[str]] = None,
-                   camera_preset: str = "cinematic-establishing") -> int:
+                   camera_preset: str = "cinematic-establishing",
+                   sky_preset: str = "afternoon") -> int:
     blender_script = ROOT / "workflows" / "_blender_assemble_full.py"
     cmd = [
         str(BLENDER), "--background", "--python", str(blender_script), "--",
@@ -131,6 +141,7 @@ def phase5_blender(heightmap: Path,
         "--engine", engine,
         "--waypoints-csv", str(waypoints_csv),
         "--camera-preset", camera_preset,
+        "--sky-preset", sky_preset,
     ]
     if ortho_dir:
         cmd += ["--ortho-dir", str(ortho_dir)]
@@ -163,6 +174,10 @@ def main(argv: list[str] | None = None) -> int:
                     choices=["fpv-walk", "fpv-bike", "low-drone", "mid-drone",
                              "cinematic-establishing", "aircraft-approach"],
                     help="Camera altitude envelope")
+    ap.add_argument("--sky-preset", default="afternoon",
+                    choices=["noon", "golden-hour", "blue-hour", "dawn",
+                             "overcast", "afternoon"],
+                    help="Time-of-day lighting mood")
     ap.add_argument("--render-preview", action="store_true")
     ap.add_argument("--enable", nargs="*", default=[],
                     help="Feature modules to apply (e.g. buildings-textured trees)")
@@ -183,6 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     cityjson = phase3_lod2(downloads, proc)
     waypoints = phase4_synthetic_waypoints(
         bbox, args.data_dir / "flight_path.csv",
+        preset_name=args.camera_preset,
     )
     out_blend = args.data_dir / f"scene_{args.region}.blend"
     render_png = args.data_dir / f"render_{args.region}.png" if args.render_preview else None

@@ -23,6 +23,9 @@ ap.add_argument("--enable", nargs="*", default=[],
                 help="Feature module names to apply, e.g. buildings-textured trees")
 ap.add_argument("--camera-preset", default="cinematic-establishing",
                 help="Named camera envelope from camera_presets.CAMERA_PRESETS")
+ap.add_argument("--sky-preset", default="afternoon",
+                choices=["noon", "golden-hour", "blue-hour", "dawn", "overcast", "afternoon"],
+                help="Named time-of-day lighting mood from sky_presets.SKY_PRESETS")
 args = ap.parse_args(argv)
 
 ext = importlib.import_module("bl_ext.user_default.blender_tools")
@@ -99,6 +102,11 @@ if args.waypoints_csv and Path(args.waypoints_csv).is_file():
 # 6. Cinematic preset.
 cinematic_preset.apply_cinematic_preset(bpy.context.scene, render_engine=args.engine)
 print(f"[blender] preset applied (engine={args.engine})")
+
+# 6a. Sky / time-of-day mood preset (overrides cinematic_preset's sun defaults).
+sky_presets = importlib.import_module("bl_ext.user_default.blender_tools.sky_presets")
+sky_presets.apply_sky_preset(bpy.context.scene, args.sky_preset)
+print(f"[blender] sky preset applied: {args.sky_preset}")
 
 # 6b. Feature-registry hook: apply optional plug-in features.
 if args.enable:
