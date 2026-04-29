@@ -33,8 +33,8 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 scene.render.engine = "CYCLES"
 scene.cycles.device = "CPU"
-scene.cycles.samples = 32  # cheap — this is plumbing not final art
-scene.render.resolution_x, scene.render.resolution_y = 800, 480
+scene.cycles.samples = 96  # higher quality so detail reads at thumbnail size
+scene.render.resolution_x, scene.render.resolution_y = 1024, 640
 scene.render.image_settings.file_format = "PNG"
 scene.view_settings.view_transform = "AgX" if "AgX" in {
     e.identifier for e in
@@ -116,11 +116,19 @@ plane = terrain_setup.build_terrain_from_heightmap(
     heightmap_exr=str(HEIGHTMAP),
     size_meters=(SIZE_X, SIZE_Y),
     subdivisions=8,    # 257 verts per side — modest but visible
-    strength=80.0,     # exaggerate hills so silhouette reads
+    strength=30.0,     # gentler hills so the ortho still reads at thumbnail size
     anchor_utm32n=ANCHOR,
 )
 terrain_setup.apply_ortho_drape(plane, ORTHO_DIR)
 render_layer(3, "heightmap_plus_drape")
+
+
+# ---------------------------------------------------------------- 04 top-down ground-only proof
+# Move the camera straight overhead so the ortho fills the frame. No ambiguity.
+cam.location = (0.0, 0.0, 1100.0)
+cam.rotation_euler = (0.0, 0.0, 0.0)
+cam.data.lens = 35.0
+render_layer(4, "topdown_ground_only")
 
 
 print(f"\n[progressive] done — {len(list(OUT.glob('*.png')))} frames in {OUT}")
