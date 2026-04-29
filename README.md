@@ -98,6 +98,28 @@ python workflows/test_progressive_layers.py --region muc-marienplatz-50m
 # -> showcase/ground_layer_test/00_sky.png ... 08_atmosphere.png + verdict
 ```
 
+**Headless plumbing run** (no Blender executable, no GPU, no Bayern data):
+`workflows/_headless_make_synth_data.py` generates a synthetic heightmap +
+a vivid synthetic UDIM ortho (`ortho.1001.jpg`), then
+`_headless_progressive.py` renders four frames using pip-installed `bpy`
+and Cycles CPU. Result, scored by the blind detector:
+
+```
+file                         hues   std edges  verdict
+00_sky.png                      2   0.3 0.000  EMPTY
+01_terrain_flat.png             6  10.0 0.002  FLAT
+02_ortho_drape.png             58  36.6 0.079  FLAT
+03_heightmap_plus_drape.png    82  38.6 0.275  GROUND_VISIBLE
+```
+
+Frame 02 jumps std 10→36, hues 6→58, edges 0.002→0.079 — the
+`apply_ortho_drape` code path works. So the missing ground in the
+existing `showcase/01_poster.png` etc. is **upstream of the drape
+function**: either the DOP tiles weren't downloaded, weren't passed to
+`_blender_assemble_full.py` via `--ortho-dir`, or were saved with a
+filename other than `ortho.<udim>.jpg`. Open the actual scene .blend
+and run `workflows/test_ortho_drape_present.py` against it to confirm.
+
 ## Known issues
 
 - **DGM1 + LoD2 endpoints return HTTP 404** from `download1.bayernwolke.de`
