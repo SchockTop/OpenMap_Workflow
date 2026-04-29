@@ -69,6 +69,35 @@ python workflows/full_pipeline.py --region muc-sued-4x2 \
 **Available datasets:** `dgm1` (1m heightmap), `dop20` / `dop40` (orthophoto, 40 cm = 4× smaller),
 `lod2` (CityGML 3D buildings).
 
+## Ground-layer audit (open question)
+
+The current `showcase/*.png` images do not visibly show a draped DOP / aerial
+photograph on the terrain — the "ground" reads as flat color or dark water.
+A blind per-image scorer (`workflows/blind_ground_detector.py`, knows nothing
+about which layer each image is) confirms this:
+
+```
+file                          hues   std edges  verdict
+04_feature_buildings.png         8   2.7 0.002  EMPTY
+06_feature_ground_shader.png     2   0.4 0.000  EMPTY
+05_feature_trees.png            15  27.5 0.021  FLAT
+07_feature_groundcover.png      20  27.8 0.100  FLAT
+01_poster.png                   50  69.0 0.289  FLAT
+03_altitude_comparison.png      58  65.1 0.157  FLAT
+```
+
+`workflows/test_progressive_layers.py` re-renders the same camera with one
+layer added at a time (sky → flat plane → **ortho drape** → heightmap →
+ground-shader → groundcover → trees → buildings → atmosphere) and runs the
+blind detector across the frames. Frame `02_ortho_drape.png` must score
+visibly higher than `01_terrain_flat.png`; if it doesn't, the orthophoto
+isn't reaching the terrain material and that's the bug to chase first.
+
+```bash
+python workflows/test_progressive_layers.py --region muc-marienplatz-50m
+# -> showcase/ground_layer_test/00_sky.png ... 08_atmosphere.png + verdict
+```
+
 ## Known issues
 
 - **DGM1 + LoD2 endpoints return HTTP 404** from `download1.bayernwolke.de`
