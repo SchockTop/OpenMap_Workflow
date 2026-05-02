@@ -1,0 +1,6 @@
+{
+  "questions": [
+    {"id": "no_color_seam", "ask": "At the edge where the building meets the ground, is there a visible abrupt color discontinuity (different DOP sampling between roof and ground)?", "expect": "no visible discontinuity", "fail_severity": "blocker"},
+    {"id": "shadow_grounded", "ask": "Is there a visible contact shadow where the building meets the ground, or does the building look like it's floating?", "expect": "grounded contact", "fail_severity": "warn"}
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "questions": [
+    {"id": "ground_close_detail", "ask": "Does the ground at the bottom of frame show ground-level detail (grass tufts, ground texture), or does it look like flat painted color?", "expect": "ground-level detail", "fail_severity": "blocker"},
+    {"id": "scale_realistic", "ask": "Do nearby buildings and trees look proportional to a 1.7m human-eye height, or wildly out of scale?", "expect": "proportional", "fail_severity": "warn"}
+  ]
+}

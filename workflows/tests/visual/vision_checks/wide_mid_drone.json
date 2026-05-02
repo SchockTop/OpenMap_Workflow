@@ -1,0 +1,7 @@
+{
+  "questions": [
+    {"id": "trees_visible_with_foliage", "ask": "Are trees visible AND do their crowns show leaf-like detail (textured silhouette), not smooth solid blobs?", "expect": "leaf-like detail", "fail_severity": "blocker"},
+    {"id": "ground_has_variation", "ask": "Does the ground show color variation (grass/soil/path differences), or is it a flat uniform color?", "expect": "variation", "fail_severity": "blocker"},
+    {"id": "buildings_and_ground_match", "ask": "Where buildings meet the ground, is there a visible color seam (sudden DOP discontinuity)?", "expect": "no visible seam", "fail_severity": "warn"}
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "questions": [
+    {"id": "no_visible_tiling", "ask": "Does the ground texture show obvious repeating tiles, or does it read as natural variation?", "expect": "natural variation", "fail_severity": "blocker"},
+    {"id": "shader_layers_blending", "ask": "Are there multiple ground material layers visible (grass/dirt/rock blend), or does it look monochrome?", "expect": "multiple layers", "fail_severity": "warn"}
+  ]
+}

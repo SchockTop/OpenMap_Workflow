@@ -1,0 +1,7 @@
+{
+  "questions": [
+    {"id": "leaf_cards_visible", "ask": "Does the foliage show leaf-shaped detail at the silhouette edges, or is it a smooth solid blob?", "expect": "leaf-shaped detail", "fail_severity": "blocker"},
+    {"id": "trunk_proportional", "ask": "Does the trunk look proportional to the foliage (not a thin stick supporting a giant ball, not a fat log under a tiny bush)?", "expect": "proportional", "fail_severity": "warn"},
+    {"id": "tree_grounded", "ask": "Does the tree appear to sit on the ground, or is there a visible gap below the trunk?", "expect": "sits on ground", "fail_severity": "blocker"}
+  ]
+}

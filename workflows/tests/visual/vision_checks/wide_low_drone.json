@@ -1,0 +1,6 @@
+{
+  "questions": [
+    {"id": "rooflines_against_horizon", "ask": "Are building rooflines visible against the sky/horizon, or are buildings clipped/missing?", "expect": "visible", "fail_severity": "blocker"},
+    {"id": "tree_silhouettes_natural", "ask": "Do tree silhouettes look organic (irregular leaf-edge), or geometric (smooth icosphere)?", "expect": "organic", "fail_severity": "blocker"}
+  ]
+}

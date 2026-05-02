@@ -1,0 +1,7 @@
+{
+  "questions": [
+    {"id": "wall_texture_visible", "ask": "Is wall texture (brick/plaster) visible, or is the wall a uniform flat color?", "expect": "texture visible", "fail_severity": "blocker"},
+    {"id": "roof_not_uniform", "ask": "Does the roof show DOP-orthophoto detail (real-world variation), or does it look like a single solid color?", "expect": "DOP detail visible", "fail_severity": "blocker"},
+    {"id": "no_roof_stretching", "ask": "On any pitched roof faces, is the texture stretched into long streaks (planar projection artifact)?", "expect": "not stretched", "fail_severity": "blocker"}
+  ]
+}

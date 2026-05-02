@@ -1,0 +1,7 @@
+{
+  "questions": [
+    {"id": "ground_visible", "ask": "Is the ground (terrain) clearly visible across at least half of the lower portion of the frame, or is it obscured by fog/haze/sky?", "expect": "clearly visible", "fail_severity": "blocker"},
+    {"id": "buildings_distinguishable", "ask": "Are individual buildings distinguishable from each other (different colors/shapes), or do they all look identical like white monopoly pieces?", "expect": "distinguishable", "fail_severity": "blocker"},
+    {"id": "no_overpowering_haze", "ask": "Is the scene readable, or is everything washed out by a uniform blue/grey haze?", "expect": "readable", "fail_severity": "blocker"}
+  ]
+}
