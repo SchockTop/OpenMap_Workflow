@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-FIXTURE_REGION = "muc-marienplatz-50m"
+FIXTURE_REGION = "muc-sued-4x2"
 SCENE_BLEND = REPO_ROOT / "data" / f"scene_{FIXTURE_REGION}.blend"
 ARTIFACTS = Path(__file__).parent / "artifacts"
 GOLDEN_DIR = Path(__file__).parent / "golden"

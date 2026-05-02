@@ -20,22 +20,24 @@ import mathutils
 
 
 def _scene_bbox_center():
-    """Return (cx, cy, cz_ground) computed from CityJSON_* buildings and Terrain.
+    """Return (cx, cy, cz_ground) computed from the Terrain mesh only.
 
-    Falls back to (0, 0, 0) if no such objects are present.
+    LoD2 imports may extend well beyond the terrain (whole-tile bbox), which
+    drags the average off-terrain. Anchoring on terrain keeps the camera on
+    the actual ground footprint.
     """
     xs, ys, zs = [], [], []
     for obj in bpy.data.objects:
         if obj.type != "MESH":
             continue
-        if not (obj.name.startswith("CityJSON_") or "Terrain" in obj.name):
+        if "Terrain" not in obj.name:
             continue
         for v in obj.bound_box:
             wv = obj.matrix_world @ mathutils.Vector(v)
             xs.append(wv.x); ys.append(wv.y); zs.append(wv.z)
     if not xs:
         return (0.0, 0.0, 0.0)
-    return ((min(xs)+max(xs))/2, (min(ys)+max(ys))/2, (min(zs)+max(zs))/2)
+    return ((min(xs)+max(xs))/2, (min(ys)+max(ys))/2, max(zs))
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
@@ -75,9 +77,26 @@ scene.collection.objects.link(cam)
 scene.camera = cam
 
 if args.framing == "wide":
-    cam.location = (cx, cy - args.altitude * 0.6, cz_ground + args.altitude)
-    pitch = math.radians(60.0) if args.altitude > 80 else math.radians(45.0)
-    cam.rotation_euler = (pitch, 0.0, 0.0)
+    if args.altitude < 10.0:
+        # FPV / walk: pull camera to the terrain edge so we're not inside the
+        # building cluster, and look across it from outside.
+        terrain = next((o for o in bpy.data.objects
+                        if o.type == "MESH" and "Terrain" in o.name), None)
+        if terrain is not None:
+            ys = []
+            for v in terrain.bound_box:
+                wv = terrain.matrix_world @ mathutils.Vector(v)
+                ys.append(wv.y)
+            edge_y = min(ys) - 30.0
+        else:
+            edge_y = cy - 200.0
+        cam.location = (cx, edge_y, cz_ground + args.altitude)
+        direction = mathutils.Vector((cx, cy, cz_ground - 5.0)) - mathutils.Vector(cam.location)
+        cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+    else:
+        cam.location = (cx, cy - args.altitude * 0.6, cz_ground + args.altitude)
+        pitch = math.radians(60.0) if args.altitude > 80 else math.radians(45.0)
+        cam.rotation_euler = (pitch, 0.0, 0.0)
     cam_data.lens = 35.0
 else:
     target = None
@@ -85,18 +104,32 @@ else:
         target = next((o for o in scene.objects
                        if o.name.startswith("CityJSON_")), None)
     elif args.preset == "close-tree":
+        # Geometry-Nodes-scattered trees have no separate object; linked
+        # TreeTpl_* templates sit at world origin. Anchor on terrain so we
+        # at least see the scattered ground; tree silhouettes will appear in
+        # the scatter mask region.
         target = next((o for o in scene.objects
-                       if "TreeTpl_" in o.name or "TreeScatter" in o.name), None)
+                       if o.type == "MESH" and "Terrain" in o.name), None)
     elif args.preset in ("close-ground-patch", "close-seam"):
         target = next((o for o in scene.objects
                        if o.type == "MESH" and ("Terrain" in o.name or "Plane" in o.name)),
                       None)
     if target is None:
-        cam.location = (cx, cy - args.altitude, cz_ground + args.altitude * 0.5)
+        tx, ty = cx, cy
     else:
-        loc = target.matrix_world.translation
-        cam.location = (loc.x, loc.y - args.altitude, loc.z + args.altitude * 0.3)
-    cam.rotation_euler = (math.radians(80.0), 0.0, 0.0)
+        # Use the target's world-space bbox center (object origin is unreliable
+        # for terrain meshes where vertices encode absolute elevation but
+        # object loc stays at 0,0,0).
+        bbx, bby = [], []
+        for v in target.bound_box:
+            wv = target.matrix_world @ mathutils.Vector(v)
+            bbx.append(wv.x); bby.append(wv.y)
+        tx = (min(bbx) + max(bbx)) / 2
+        ty = (min(bby) + max(bby)) / 2
+    cam.location = (tx, ty - args.altitude, cz_ground + args.altitude * 0.5)
+    # Look-at: aim camera at target XY, ground level — use track_to math.
+    direction = mathutils.Vector((tx, ty, cz_ground)) - mathutils.Vector(cam.location)
+    cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
     cam_data.lens = 50.0
 
 # === Render ===
