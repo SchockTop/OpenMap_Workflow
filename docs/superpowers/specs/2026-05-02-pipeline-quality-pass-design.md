@@ -281,7 +281,7 @@ def vision_review(slot: str, png_path: Path) -> dict:
     checklist = json.loads((CHECKS_DIR / f"{slot}.json").read_text())
     img_b64 = base64.b64encode(png_path.read_bytes()).decode()
     msg = client.messages.create(
-        model="claude-haiku-4-5-20251001",  # cheap; vision quality sufficient
+        model="claude-opus-4-7",  # best DocVQA score (93.0); careful visual reasoning
         max_tokens=1024,
         system="You are a graphics QA reviewer. For each question, answer strictly: 'pass' or 'fail: <one-sentence reason>'. Output JSON only.",
         messages=[{
@@ -299,7 +299,7 @@ def vision_review(slot: str, png_path: Path) -> dict:
     return json.loads(msg.content[0].text)
 ```
 
-**Test integration.** Each pytest test calls `vision_review(slot, artifact_path)` and asserts every blocker-severity question returns `"pass"`. Warn-severity failures are logged but don't fail the test. Per-call cost ~$0.001 with Haiku 4.5; suite total ~$0.01. Caching: the harness skips re-review if the PNG hash matches a cached result in `artifacts/.vision_cache/`.
+**Test integration.** Each pytest test calls `vision_review(slot, artifact_path)` and asserts every blocker-severity question returns `"pass"`. Warn-severity failures are logged but don't fail the test. Per-call cost ~$0.015 with Opus 4.7; suite total ~$0.12 for the 8-slot matrix. Caching: the harness skips re-review if the PNG hash matches a cached result in `artifacts/.vision_cache/`, so green runs cost effectively zero. Opus is overkill for binary checklists but eliminates the false-positive class on subtle judgments ("is this stretched or detailed?", "is the seam visible?") — and the suite isn't run on every save, so the absolute cost is small.
 
 **Why three tiers, not just LLM:**
 
@@ -410,6 +410,6 @@ Independent research reviewer cross-checked the v1 spec against Blosm, BlenderGI
 | 9 | Added `density_mask` attribute hook on tree GN scatter (deferred wiring) | OSM2World/Blosm precedent; no-op now but preserves the seam for landuse-driven scatter |
 | 10 | Added Library Overrides documentation note | Blender 4.x+ idiom for per-instance tweaks of linked assets |
 | 11 | Render matrix expanded 4 → 8 slots (3 altitude bands wide + 4 close-ups) | Per-feature isolation needs close shots; aerial wide alone hides leaf/seam/tile artifacts |
-| 12 | Added LLM-vision review tier (Haiku 4.5 with image input + per-slot YAML checklists) | Catches semantic regressions metrics + RMSE pass through (floating trees, smooth-blob foliage, color-correct wrong roofs); ~$0.01/run, opt-in |
+| 12 | Added LLM-vision review tier (Opus 4.7 with image input + per-slot YAML checklists) | Catches semantic regressions metrics + RMSE pass through (floating trees, smooth-blob foliage, color-correct wrong roofs); ~$0.12/run, opt-in, near-zero on cached green runs |
 
 The v1 acceptance criteria are unchanged. The implementation order is unchanged.
