@@ -22,8 +22,8 @@ sys.path.insert(0, str(ROOT / "OpenMap_Unifier"))
 sys.path.insert(0, str(ROOT / "openmap_blender_tools"))
 
 from backend.downloader import MapDownloader  # noqa: E402
-from blender_tools.geo_import import dgm_tif_to_heightmap, dop_to_udim_tiles  # noqa: E402
-from blender_tools.citygml_import import gml_to_cityjson_pure  # noqa: E402
+from openmap_blender_tools.geo_import import dgm_tif_to_heightmap, dop_to_udim_tiles  # noqa: E402
+from openmap_blender_tools.citygml_import import gml_to_cityjson_pure  # noqa: E402
 from workflows.region_presets import polygon_for_region  # noqa: E402
 
 BLENDER = Path(r"C:/Program Files/Blender Foundation/Blender 5.1/blender.exe")
@@ -99,7 +99,7 @@ def phase4_synthetic_waypoints(bbox: tuple[float, float, float, float],
     """
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
-        from blender_tools.waypoint_generators import generate_waypoints_for_preset
+        from openmap_blender_tools.waypoint_generators import generate_waypoints_for_preset
         pts = generate_waypoints_for_preset(preset_name, bbox)
     except Exception as e:
         print(f"[4] preset waypoint gen failed ({e}); falling back to S-curve")
