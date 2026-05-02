@@ -143,6 +143,15 @@ if enabled_features:
     }
     features_mod.apply_enabled(enabled_features, feat_context)
 
+    # Sprint 7: register altitude-driven DOP-weight handler (Task 7).
+    try:
+        ah_mod = importlib.import_module(
+            "bl_ext.user_default.blender_tools.altitude_handler")
+        ah_mod.register()
+        print("[assemble] altitude_handler registered (render_pre)")
+    except Exception as e:
+        print(f"[assemble] WARN: altitude_handler not registered: {e}")
+
 bpy.ops.wm.save_as_mainfile(filepath=args.out_blend)
 print(f"[blender] saved scene: {args.out_blend}")
 
