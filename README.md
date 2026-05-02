@@ -78,6 +78,45 @@ python workflows/full_pipeline.py --region muc-sued-4x2 \
   - Workaround until the real URL pattern is found: fetch a `.meta4` file
     manually from the LDBV portal and use `MapDownloader.parse_metalink()`.
 
+## Modifying the output `.blend`
+
+Each project has different needs. The pipeline produces a `.blend` with documented swap seams — you don't need to re-run the pipeline to change assets.
+
+### Per-region overrides (preferred)
+
+Drop files into `data/<region>/` to override the bundled defaults for that region only:
+
+| File | What it overrides |
+|---|---|
+| `data/<region>/trees.blend` | Custom tree assets — must contain a top-level collection named `TreeTemplates` with mesh objects |
+| `data/<region>/textures/dop_*.jpg` | Higher-resolution orthophotos (UDIM auto-tiled) |
+| `data/<region>/textures/leaves/<species>.png` | Higher-resolution leaf textures |
+| `data/<region>/ground_overrides.json` | Per-region procedural shader weights (forest mask, field altitude, altitude-DOP curve) |
+
+### Editing the produced `.blend` directly
+
+Material names are stable — find them by name and edit:
+
+- `BldRoof_DOP`, `BldWall_PBR`, `BldGround` — building materials
+- `GroundShader_Layered` — ground shader; the `DropDrapeMix` node's `Fac` is driven by the altitude handler at render time (camera-Z curve)
+- `TreeLeaf_<Species>`, `TreeBark_<Species>` — tree materials
+
+The `DOPProjector` Empty is the shared anchor for orthophoto UV. Drag it in the scene to re-align both roofs and ground at once. Scale it to change DOP coverage. Both roofs (Box mapping) and ground (Flat mapping) reference it via `Texture Coordinate.Object`, so they stay in sync.
+
+### Swapping a single linked tree species (Library Overrides)
+
+Tree templates are linked from `assets/trees.blend` (or the per-region override). To tweak one species per-region without breaking the link:
+
+1. Select the linked tree object in the outliner.
+2. Right-click → `Library Override → Make`.
+3. Edit scale, rotation, or even mesh — your override stays attached to the link.
+
+This is the Blender 4.x+ idiom for per-instance edits to linked assets.
+
+### Swapping leaf textures
+
+Replace any `assets/textures/leaves/<species>_color.png` with a higher-resolution version. Keep the filename. Reopen the `.blend` and the new texture loads automatically (relative-path image references).
+
 ## Submodule URLs
 
 Currently `file://` paths for offline development. Re-point to GitHub once the
