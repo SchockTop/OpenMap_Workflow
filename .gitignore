@@ -2,3 +2,7 @@ data/
 __pycache__/
 *.pyc
 *.blend1
+
+# Visual test artifacts (regenerated per run)
+workflows/tests/visual/artifacts/
+workflows/tests/visual/artifacts/.vision_cache/
