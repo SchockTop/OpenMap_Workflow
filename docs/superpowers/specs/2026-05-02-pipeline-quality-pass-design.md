@@ -271,35 +271,34 @@ A third layer of test defense, running after the metric assertions and the RMSE 
 }
 ```
 
-**Agent invocation.** From the pytest harness:
+**Execution: Claude Code in-session, Opus 4.7, free.**
 
-```python
-from anthropic import Anthropic
-client = Anthropic()  # ANTHROPIC_API_KEY from env
+The pytest harness:
 
-def vision_review(slot: str, png_path: Path) -> dict:
-    checklist = json.loads((CHECKS_DIR / f"{slot}.json").read_text())
-    img_b64 = base64.b64encode(png_path.read_bytes()).decode()
-    msg = client.messages.create(
-        model="claude-opus-4-7",  # best DocVQA score (93.0); careful visual reasoning
-        max_tokens=1024,
-        system="You are a graphics QA reviewer. For each question, answer strictly: 'pass' or 'fail: <one-sentence reason>'. Output JSON only.",
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64",
-                  "media_type": "image/png", "data": img_b64}},
-                {"type": "text", "text":
-                  f"Review this {slot} render. Answer each question:\n" +
-                  "\n".join(f"- {q['id']}: {q['ask']}" for q in checklist["questions"]) +
-                  "\n\nReturn JSON: {\"<question_id>\": \"pass\" | \"fail: <reason>\"}"}
-            ]
-        }]
-    )
-    return json.loads(msg.content[0].text)
+1. Renders all 8 PNGs to `workflows/tests/visual/artifacts/`.
+2. Writes `artifacts/vision_review.todo.json` listing every `(slot, png_path, checklist)` tuple plus the SHA-256 of each PNG.
+3. If `artifacts/vision_review.results.json` exists **and** every recorded `_png_hashes[slot]` matches the current PNG, loads the results and asserts immediately. Otherwise marks the test `xfail` with reason `"awaiting vision review — run /review-renders"`.
+
+The user (in Claude Code, Opus 4.7) runs `/review-renders` — a small project slash command in `.claude/commands/review-renders.md` whose body says: *"Read every PNG listed in `artifacts/vision_review.todo.json`. For each slot, work through its checklist and write the structured answer into `artifacts/vision_review.results.json` using the schema below. Don't skip slots."*
+
+Output schema:
+
+```json
+{
+  "close_tree": {
+    "leaf_cards_visible": "pass",
+    "trunk_proportional": "pass",
+    "tree_grounded": "fail: visible 0.3m gap between trunk base and ground"
+  },
+  "_png_hashes": {"close_tree": "sha256:..."}
+}
 ```
 
-**Test integration.** Each pytest test calls `vision_review(slot, artifact_path)` and asserts every blocker-severity question returns `"pass"`. Warn-severity failures are logged but don't fail the test. Per-call cost ~$0.015 with Opus 4.7; suite total ~$0.12 for the 8-slot matrix. Caching: the harness skips re-review if the PNG hash matches a cached result in `artifacts/.vision_cache/`, so green runs cost effectively zero. Opus is overkill for binary checklists but eliminates the false-positive class on subtle judgments ("is this stretched or detailed?", "is the seam visible?") — and the suite isn't run on every save, so the absolute cost is small.
+Re-running pytest now sees the results file, hashes match → assertions run, blocker-severity failures fail the test, warn-severity log only. Cost: $0 (Claude Code subscription).
+
+If a render changes (different shader, different camera), its hash changes → the cached vision result is invalidated for that slot only and pytest goes back to `xfail` until re-reviewed. So the loop is: edit code → render → ask Claude Code to review the changed slots → green tests.
+
+**No API key, no Anthropic SDK dependency, no billing setup.** If CI is added later, the same pattern can be wired with the SDK — but that's deferred until CI exists.
 
 **Why three tiers, not just LLM:**
 
@@ -387,7 +386,7 @@ Each step is independently mergeable.
 - [ ] `01_poster.png` building region has ≥ 12 unique hues (sample of 100 buildings).
 - [ ] User can drop `data/muc-sued-4x2/trees.blend` containing a `TreeTemplates` collection, re-open the assembled `.blend`, and see different trees without re-running the pipeline.
 - [ ] User can replace `assets/textures/leaves/oak_color.png` with a higher-resolution version, reopen the scene, and see the new texture.
-- [ ] `pytest --vision-review` passes all 8 slots' blocker-severity vision checks on a clean run.
+- [ ] After running pytest + `/review-renders` in Claude Code, all 8 slots' blocker-severity vision checks pass.
 
 ## Open questions
 
@@ -410,6 +409,6 @@ Independent research reviewer cross-checked the v1 spec against Blosm, BlenderGI
 | 9 | Added `density_mask` attribute hook on tree GN scatter (deferred wiring) | OSM2World/Blosm precedent; no-op now but preserves the seam for landuse-driven scatter |
 | 10 | Added Library Overrides documentation note | Blender 4.x+ idiom for per-instance tweaks of linked assets |
 | 11 | Render matrix expanded 4 → 8 slots (3 altitude bands wide + 4 close-ups) | Per-feature isolation needs close shots; aerial wide alone hides leaf/seam/tile artifacts |
-| 12 | Added LLM-vision review tier (Opus 4.7 with image input + per-slot YAML checklists) | Catches semantic regressions metrics + RMSE pass through (floating trees, smooth-blob foliage, color-correct wrong roofs); ~$0.12/run, opt-in, near-zero on cached green runs |
+| 12 | Added LLM-vision review tier (Opus 4.7 via Claude Code session + per-slot YAML checklists) | Catches semantic regressions metrics + RMSE pass through (floating trees, smooth-blob foliage, color-correct wrong roofs); $0 cost, no API key, results cached by PNG hash |
 
 The v1 acceptance criteria are unchanged. The implementation order is unchanged.
