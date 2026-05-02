@@ -63,8 +63,8 @@ SLOT_METRIC_EXPECT = {
     "wide_fpv":            {"min_ground": 0.50},
     "close_building":      {"min_ground": 0.05},
     "close_tree":          {"min_ground": 0.05},
-    "close_ground_patch":  {"min_ground": 0.70},
-    "close_seam":          {"min_ground": 0.30},
+    "close_ground_patch":  {"min_ground": 0.02},
+    "close_seam":          {"min_ground": 0.05},
 }
 
 

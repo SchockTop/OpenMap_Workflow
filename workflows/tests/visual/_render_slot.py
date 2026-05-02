@@ -99,35 +99,45 @@ if args.framing == "wide":
         cam.rotation_euler = (pitch, 0.0, 0.0)
     cam_data.lens = 35.0
 else:
-    target = None
-    if args.preset == "close-building":
-        target = next((o for o in scene.objects
-                       if o.name.startswith("CityJSON_")), None)
-    elif args.preset == "close-tree":
-        # Geometry-Nodes-scattered trees have no separate object; linked
-        # TreeTpl_* templates sit at world origin. Anchor on terrain so we
-        # at least see the scattered ground; tree silhouettes will appear in
-        # the scatter mask region.
-        target = next((o for o in scene.objects
-                       if o.type == "MESH" and "Terrain" in o.name), None)
-    elif args.preset in ("close-ground-patch", "close-seam"):
-        target = next((o for o in scene.objects
-                       if o.type == "MESH" and ("Terrain" in o.name or "Plane" in o.name)),
-                      None)
-    if target is None:
-        tx, ty = cx, cy
+    # All close-shots: anchor on the terrain's south edge so we're outside the
+    # building cluster looking in. Pick a target that gives the slot's intent.
+    terrain = next((o for o in bpy.data.objects
+                    if o.type == "MESH" and "Terrain" in o.name), None)
+    if terrain is not None:
+        xs, ys = [], []
+        for v in terrain.bound_box:
+            wv = terrain.matrix_world @ mathutils.Vector(v)
+            xs.append(wv.x); ys.append(wv.y)
+        terrain_min_y = min(ys)
+        terrain_max_y = max(ys)
+        terrain_mid_x = (min(xs) + max(xs)) / 2
     else:
-        # Use the target's world-space bbox center (object origin is unreliable
-        # for terrain meshes where vertices encode absolute elevation but
-        # object loc stays at 0,0,0).
-        bbx, bby = [], []
-        for v in target.bound_box:
-            wv = target.matrix_world @ mathutils.Vector(v)
-            bbx.append(wv.x); bby.append(wv.y)
-        tx = (min(bbx) + max(bbx)) / 2
-        ty = (min(bby) + max(bby)) / 2
-    cam.location = (tx, ty - args.altitude, cz_ground + args.altitude * 0.5)
-    # Look-at: aim camera at target XY, ground level — use track_to math.
+        terrain_min_y = cy - 100.0
+        terrain_max_y = cy + 100.0
+        terrain_mid_x = cx
+
+    if args.preset == "close-building":
+        # Pick southernmost building so we frame its façade against open ground.
+        candidates = [o for o in scene.objects if o.name.startswith("CityJSON_")]
+        target = min(candidates, key=lambda o: o.matrix_world.translation.y, default=None)
+        if target is not None:
+            loc = target.matrix_world.translation
+            tx, ty = loc.x, loc.y
+        else:
+            tx, ty = terrain_mid_x, terrain_min_y + 50.0
+        cam.location = (tx, ty - args.altitude * 1.5, cz_ground + args.altitude * 0.6)
+    elif args.preset == "close-tree":
+        # No tree-instance objects exist (GN scatter). Anchor near a vegetation
+        # patch — terrain south-quarter has the scatter mask peak in muc-sued.
+        tx = terrain_mid_x
+        ty = terrain_min_y + (terrain_max_y - terrain_min_y) * 0.3
+        cam.location = (tx, ty - args.altitude * 4, cz_ground + args.altitude * 0.4)
+    else:  # close-ground-patch, close-seam
+        # Look at a point near the south edge — open ground, no buildings.
+        tx = terrain_mid_x
+        ty = terrain_min_y + 80.0
+        cam.location = (tx, ty - args.altitude * 2, cz_ground + args.altitude * 0.7)
+
     direction = mathutils.Vector((tx, ty, cz_ground)) - mathutils.Vector(cam.location)
     cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
     cam_data.lens = 50.0
