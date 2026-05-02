@@ -212,6 +212,103 @@ Plain JSON, e.g. `golden/poster.json`:
 
 Golden values are recorded by running the harness once after the fixes land and copying the `metrics` blob into the JSON. Tolerances absorb procedural-shader seed drift.
 
+### Render matrix — wide + close at multiple altitudes
+
+The visual harness renders **8 shots per run**, not 4. Three altitude bands × wide-or-close framings, plus two synthetic close-ups for per-feature isolation. This is what the LLM-vision tier (next subsection) actually inspects.
+
+| Slot | Altitude | Framing | Purpose |
+|---|---|---|---|
+| `wide_aerial` | 2000 m | wide, looking down ~60° | building density, ground/roof seam at altitude |
+| `wide_mid_drone` | 500 m | wide, looking down ~45° | tree distribution, neighborhood-scale scene composition |
+| `wide_low_drone` | 80 m | wide, horizontal | building heights, rooflines against horizon |
+| `wide_fpv` | 1.7 m | wide, horizontal | groundcover, ground-level realism, eye-level building scale |
+| `close_building` | 30 m | one building filling frame | wall PBR, roof DOP texture, no roof tiling artifacts |
+| `close_tree` | 5 m | one tree filling frame | leaf-card alpha, trunk mesh, foliage silhouette (NOT solid blob) |
+| `close_ground_patch` | 10 m | 5×5 m ground patch | shader detail, no obvious tiling, slope blending |
+| `close_seam` | 20 m | edge of one building meeting ground | DOP color seam test (Section 2) |
+
+All rendered to `workflows/tests/visual/artifacts/<slot>.png` at 768×512. Total render budget ~80 s on the Marienplatz fixture (renders are small and the scene is already loaded).
+
+### LLM-vision review tier (added)
+
+A third layer of test defense, running after the metric assertions and the RMSE tripwire. For each of the 8 rendered images, a vision-capable agent (called via `pytest --vision-review` opt-in flag) reads the PNG and answers a structured checklist tailored to that slot. Catches things that pass numeric metrics but are still wrong: floating trees, visible texture tiling, smooth-blob foliage, hue-correct-but-wrong-color roofs, sky occluding the foreground, etc.
+
+**Per-slot checklists** (`workflows/tests/visual/vision_checks/<slot>.json`):
+
+```json
+// close_tree.json
+{
+  "questions": [
+    {"id": "leaf_cards_visible",
+     "ask": "Does the tree have visible leaf-shaped detail along the foliage silhouette, or is the foliage a smooth solid blob?",
+     "expect": "leaf-shaped detail",
+     "fail_severity": "blocker"},
+    {"id": "trunk_proportional",
+     "ask": "Does the trunk look proportional to the foliage (not a thin stick supporting a giant ball, not a fat log under a tiny bush)?",
+     "expect": "yes",
+     "fail_severity": "warn"},
+    {"id": "tree_grounded",
+     "ask": "Does the tree appear to sit on the ground, or is it floating with visible gap below the trunk?",
+     "expect": "sits on ground",
+     "fail_severity": "blocker"}
+  ]
+}
+```
+
+```json
+// close_seam.json
+{
+  "questions": [
+    {"id": "no_color_seam",
+     "ask": "At the edge where the building meets the ground, is there a visible abrupt color discontinuity (different DOP sampling)?",
+     "expect": "no visible discontinuity",
+     "fail_severity": "blocker"},
+    {"id": "roof_pitch_no_stretch",
+     "ask": "On the pitched roof, does the texture appear stretched into streaks on the steep faces?",
+     "expect": "not stretched",
+     "fail_severity": "blocker"}
+  ]
+}
+```
+
+**Agent invocation.** From the pytest harness:
+
+```python
+from anthropic import Anthropic
+client = Anthropic()  # ANTHROPIC_API_KEY from env
+
+def vision_review(slot: str, png_path: Path) -> dict:
+    checklist = json.loads((CHECKS_DIR / f"{slot}.json").read_text())
+    img_b64 = base64.b64encode(png_path.read_bytes()).decode()
+    msg = client.messages.create(
+        model="claude-haiku-4-5-20251001",  # cheap; vision quality sufficient
+        max_tokens=1024,
+        system="You are a graphics QA reviewer. For each question, answer strictly: 'pass' or 'fail: <one-sentence reason>'. Output JSON only.",
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64",
+                  "media_type": "image/png", "data": img_b64}},
+                {"type": "text", "text":
+                  f"Review this {slot} render. Answer each question:\n" +
+                  "\n".join(f"- {q['id']}: {q['ask']}" for q in checklist["questions"]) +
+                  "\n\nReturn JSON: {\"<question_id>\": \"pass\" | \"fail: <reason>\"}"}
+            ]
+        }]
+    )
+    return json.loads(msg.content[0].text)
+```
+
+**Test integration.** Each pytest test calls `vision_review(slot, artifact_path)` and asserts every blocker-severity question returns `"pass"`. Warn-severity failures are logged but don't fail the test. Per-call cost ~$0.001 with Haiku 4.5; suite total ~$0.01. Caching: the harness skips re-review if the PNG hash matches a cached result in `artifacts/.vision_cache/`.
+
+**Why three tiers, not just LLM:**
+
+- Metrics (cheap, deterministic) — catch dimensional regressions, run in every dev loop.
+- RMSE tripwire (cheap, deterministic) — catches "everything went black" class of failures.
+- LLM-vision (slow, costs cents, opt-in) — catches semantic regressions metrics miss. Run in CI and before showcase regeneration, not on every save.
+
+Failures from any tier write annotated diff PNGs to `artifacts/` for human review.
+
 ### Showcase regeneration
 
 A new `workflows/regenerate_showcase.py` invokes the same harness on the larger `muc-sued-4x2` region and writes `showcase/01_poster.png` … `showcase/07_feature_*.png`. README is updated to make it clear the showcase is the test harness output. **Single source of truth — tests and showcase cannot drift.**
@@ -290,6 +387,7 @@ Each step is independently mergeable.
 - [ ] `01_poster.png` building region has ≥ 12 unique hues (sample of 100 buildings).
 - [ ] User can drop `data/muc-sued-4x2/trees.blend` containing a `TreeTemplates` collection, re-open the assembled `.blend`, and see different trees without re-running the pipeline.
 - [ ] User can replace `assets/textures/leaves/oak_color.png` with a higher-resolution version, reopen the scene, and see the new texture.
+- [ ] `pytest --vision-review` passes all 8 slots' blocker-severity vision checks on a clean run.
 
 ## Open questions
 
@@ -311,5 +409,7 @@ Independent research reviewer cross-checked the v1 spec against Blosm, BlenderGI
 | 8 | Added RMSE tripwire alongside metric assertions | Catches catastrophic regressions that hue/luminance metrics pass through |
 | 9 | Added `density_mask` attribute hook on tree GN scatter (deferred wiring) | OSM2World/Blosm precedent; no-op now but preserves the seam for landuse-driven scatter |
 | 10 | Added Library Overrides documentation note | Blender 4.x+ idiom for per-instance tweaks of linked assets |
+| 11 | Render matrix expanded 4 → 8 slots (3 altitude bands wide + 4 close-ups) | Per-feature isolation needs close shots; aerial wide alone hides leaf/seam/tile artifacts |
+| 12 | Added LLM-vision review tier (Haiku 4.5 with image input + per-slot YAML checklists) | Catches semantic regressions metrics + RMSE pass through (floating trees, smooth-blob foliage, color-correct wrong roofs); ~$0.01/run, opt-in |
 
 The v1 acceptance criteria are unchanged. The implementation order is unchanged.
