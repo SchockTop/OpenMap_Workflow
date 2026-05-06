@@ -4,6 +4,27 @@ Audit date: 2026-05-06. Covers the umbrella repo and both submodules
 (`OpenMap_Unifier`, `openmap_blender_tools`). Each item lists where the work
 lives, status, and next action.
 
+> ## ⚠️ Environment note for future Claude / agent sessions
+>
+> **The Claude Code sandbox cannot reach Bayern OpenData endpoints.**
+> Probed 2026-05-06: every request to `download1.bayernwolke.de`,
+> `download2.bayernwolke.de`, and `geodaten.bayern.de` returns
+> **HTTP 403 *host_not_allowed*** — sandbox firewall, not Bayern.
+>
+> Practical implications:
+> - You cannot live-test the DGM1 / DGM5 / LoD2 download URL patterns.
+> - You cannot verify which fix (incremental in main vs. per-dataset
+>   refactor on the unmerged fix branch) actually resolves the 404s.
+> - Don't waste time re-probing endpoints from this sandbox — the result
+>   is deterministic.
+> - Pipeline development should go through the offline / `--skip-download`
+>   path and the synthetic-data harness in `workflows/_headless_*.py`.
+>
+> Live verification has to happen on a host with egress to Bayern
+> (e.g. the user's laptop or a CI runner with appropriate allowlist).
+> The same applies to the synthetic-Blender harness if you need a real
+> Blender executable: this sandbox has only pip-installed `bpy`.
+
 ## Legend
 
 - ✅ ready to merge — clean, tested, no blockers
