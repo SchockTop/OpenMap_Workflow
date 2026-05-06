@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "_comment": "Default ruleset for TRIAN3D Builder FBX exports. Object names follow TRIAN3D's <layer>_<id> convention. Override with --rules path/to/your.json.",
+  "organize": [
+    {"collection": "Buildings/Residential", "match": {"name_regex": "^bldg_(res|house|apartment)_"}},
+    {"collection": "Buildings/Industrial",  "match": {"name_regex": "^bldg_(ind|warehouse|factory)_"}},
+    {"collection": "Buildings/Commercial",  "match": {"name_regex": "^bldg_(com|office|retail|shop)_"}},
+    {"collection": "Buildings/Other",       "match": {"name_regex": "^(bldg|building)_"}},
+    {"collection": "Vegetation/Trees",      "match": {"name_regex": "^veg_tree_"}},
+    {"collection": "Vegetation/Forest",     "match": {"name_regex": "^(forest|veg_forest)_"}},
+    {"collection": "Vegetation/Other",      "match": {"name_regex": "^veg_"}},
+    {"collection": "Roads/Highway",         "match": {"name_regex": "^road_(motorway|trunk|primary)_"}},
+    {"collection": "Roads/Secondary",       "match": {"name_regex": "^road_(secondary|tertiary)_"}},
+    {"collection": "Roads/Local",           "match": {"name_regex": "^road_(residential|service|track)_"}},
+    {"collection": "Roads/Other",           "match": {"name_regex": "^road_"}},
+    {"collection": "Water/Rivers",          "match": {"name_regex": "^water_(river|stream)_"}},
+    {"collection": "Water/Lakes",           "match": {"name_regex": "^water_(lake|pond|reservoir)_"}},
+    {"collection": "Water/Other",           "match": {"name_regex": "^water_"}},
+    {"collection": "Land use/Fields",       "match": {"name_regex": "^(field|landuse_farmland)_"}},
+    {"collection": "Land use/Other",        "match": {"name_regex": "^(landuse|land)_"}},
+    {"collection": "Reference",             "match": {"name_regex": "^(camera|light|helper|empty)"}}
+  ],
+  "_materials_doc": "Add per-AOI material rules in your project's overrides file (--rules ...). Each rule needs {material: '<name in bpy.data.materials>', match: {...}}. Material names must already exist in the .blend (load via Asset Library or create them manually before running the import).",
+  "materials": []
+}

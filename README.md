@@ -246,6 +246,86 @@ function**: either the DOP tiles weren't downloaded, weren't passed to
 filename other than `ortho.<udim>.jpg`. Open the actual scene .blend
 and run `workflows/test_ortho_drape_present.py` against it to confirm.
 
+## TRIAN3D Builder import
+
+If you build the surrounding region in [TRIAN3D Builder](https://www.trian3dbuilder.de/),
+export it as **Autodesk FBX** (with Materials, Textures, and Hierarchy
+ticked) and feed it into:
+
+```bash
+# Fresh scene (just the TRIAN3D import):
+python workflows/trian3d_import.py --fbx my_export.fbx --out scene.blend
+
+# Drop on top of the existing terrain build:
+python workflows/trian3d_import.py --fbx my_export.fbx \
+    --into-existing data/scene_custom.blend \
+    --out data/scene_custom_with_trian.blend
+```
+
+What it does, in three passes:
+
+1. **Organize** — every imported object is moved into a Blender Collection
+   based on a regex match against its name. Defaults match TRIAN3D's
+   `bldg_…`, `road_…`, `veg_tree_…`, `water_river_…`, `field_…` naming, so
+   you get this hierarchy out of the box:
+
+   ```
+   Scene Collection
+   ├── Buildings/{Residential, Industrial, Commercial, Other}
+   ├── Vegetation/{Trees, Forest, Other}
+   ├── Roads/{Highway, Secondary, Local, Other}
+   ├── Water/{Rivers, Lakes, Other}
+   ├── Land use/{Fields, Other}
+   └── Reference (cameras, lights, helpers)
+   ```
+
+   Override the rules with `--rules my_rules.json`. Schema example:
+
+   ```json
+   {
+     "version": 1,
+     "organize": [
+       {"collection": "Buildings/Heritage", "match": {"name_regex": "^bldg_listed_"}}
+     ],
+     "materials": [
+       {"material": "Field_Wheat", "match": {"prop": "osm_class", "equals": "wheat"}},
+       {"material": "Field_Corn",  "match": {"prop": "osm_id",    "in": [123, 456, 789]}}
+     ]
+   }
+   ```
+
+   Match predicates: `name_regex`, `material_name_regex`, or `prop` with
+   `equals` / `in` / `regex`. Combine multiple keys for AND logic. First
+   matching rule wins — order more-specific rules first.
+
+2. **Apply materials** — each `materials` rule swaps material slot 0 of
+   matching objects to the named material. The material must already
+   exist in the .blend (load via `--into-existing` from a scene that
+   contains it, or via Blender's Asset Library).
+
+3. **Collapse duplicate meshes to linked data** — TRIAN3D output often
+   contains thousands of objects with bit-identical meshes (same building
+   mesh repeated, same tree, etc.). This pass groups them by
+   `(vertex_count, edge_count, polygon_count, first_vertex_coord)` and
+   relinks every duplicate to a single canonical Mesh datablock. On a
+   real 130 km² scene this can drop scene memory by 80–95 %. Pass
+   `--no-collapse` to skip.
+
+### Behind the scenes (extending the Blender plugin)
+
+The pure-Python pieces live in:
+
+- `workflows/trian3d_rules.py` — rule schema + matcher (no bpy)
+- `workflows/trian3d_apply.py` — `organize_scene` / `apply_material_rules`
+  / `collapse_to_linked_data` (lazy bpy)
+- `workflows/_blender_trian3d_import.py` — Blender entry point
+- `workflows/trian3d_import.py` — CPython orchestrator
+
+These can be wrapped as `bpy.types.Operator`s in
+`openmap_blender_tools/operators.py` to expose the same actions as
+N-panel buttons. Pattern matches the existing `BLENDERTOOLS_OT_cull_hidden`
+operator in that submodule.
+
 ## Known issues
 
 - **DGM1 + LoD2 endpoints return HTTP 404** from `download1.bayernwolke.de`
