@@ -69,6 +69,44 @@ python workflows/full_pipeline.py --region muc-sued-4x2 \
 **Available datasets:** `dgm1` (1m heightmap), `dop20` / `dop40` (orthophoto, 40 cm = 4× smaller),
 `lod2` (CityGML 3D buildings).
 
+## Offline / behind-a-proxy: bring your own tiles
+
+If your network blocks `download1.bayernwolke.de` / `geodaten.bayern.de`
+(corporate proxy, air-gapped machine, …), fetch the tiles yourself — for
+example by browsing the [LDBV OpenData portal](https://geodaten.bayern.de/opengeodata/)
+and downloading directly, or by feeding the URL list into a proxy-aware
+downloader like `curl --proxy …` or `aria2c` — then point the pipeline at
+the local files with `--skip-download`:
+
+```bash
+# Drop your tiles into any layout you like, e.g.:
+#   my_tiles/dgm/*.tif
+#   my_tiles/dop/*.tif
+#   my_tiles/lod2/*.gml      (or .zip — the GML can stay zipped)
+
+python workflows/full_pipeline.py --skip-download --region muc-sued-4x2 \
+    --local-dgm  my_tiles/dgm \
+    --local-dop  my_tiles/dop \
+    --local-lod2 my_tiles/lod2 \
+    --render-preview
+```
+
+You can also skip the named region entirely and supply an explicit bbox in
+EPSG:25832 metres:
+
+```bash
+python workflows/full_pipeline.py --skip-download \
+    --bbox-utm32n 686000 5331000 690000 5333000 \
+    --local-dgm my_tiles/dgm --local-dop my_tiles/dop \
+    --render-preview
+```
+
+`--skip-download` accepts files **or** directories (recursive) for each
+`--local-*` flag, and falls back to `data/raw/<dataset>/` if you've
+previously downloaded but want to re-run preprocessing without hitting the
+network again. DGM/DOP are matched by `*.tif`/`*.tiff`; LoD2 by
+`*.gml`/`*.xml`/`*.zip`.
+
 ## Known issues
 
 - **DGM1 + LoD2 endpoints return HTTP 404** from `download1.bayernwolke.de`

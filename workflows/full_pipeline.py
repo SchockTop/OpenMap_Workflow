@@ -7,9 +7,21 @@ Phases (CPython unless noted):
   4. (Optional) generate synthetic waypoint CSV from bbox if none provided.
   5. Spawn Blender to assemble scene + render preview.
 
-Usage:
+Usage (download + render):
     python workflows/full_pipeline.py --region muc-sued-4x2 \\
         --datasets dgm1 dop40 lod2 --render-preview
+
+Usage (offline / behind a proxy — bring your own tiles):
+    python workflows/full_pipeline.py --skip-download --region muc-sued-4x2 \\
+        --local-dgm  path/to/dgm_dir \\
+        --local-dop  path/to/dop_dir \\
+        --local-lod2 path/to/lod2_dir \\
+        --render-preview
+
+    # Or with an explicit bbox (no named region required):
+    python workflows/full_pipeline.py --skip-download \\
+        --bbox-utm32n 686000 5331000 690000 5333000 \\
+        --local-dgm path/to/dgm_dir --render-preview
 """
 from __future__ import annotations
 import argparse, csv, math, subprocess, sys
@@ -44,6 +56,50 @@ def phase1_download(poly_wkt: str, datasets: list[str], out_root: Path) -> dict[
             if ok and (dl_dir / name).is_file():
                 downloaded.append(dl_dir / name)
         result[ds] = downloaded
+    return result
+
+
+# Map of dataset key -> file extensions accepted when collecting local tiles.
+_LOCAL_EXT_BY_DATASET: dict[str, tuple[str, ...]] = {
+    "dgm1":  (".tif", ".tiff"),
+    "dop20": (".tif", ".tiff"),
+    "dop40": (".tif", ".tiff"),
+    "lod2":  (".gml", ".xml", ".zip"),
+}
+
+
+def _collect_local_files(paths: list[Path], extensions: tuple[str, ...]) -> list[Path]:
+    """Expand a mixed list of files/directories into a flat list of files
+    matching `extensions` (case-insensitive)."""
+    out: list[Path] = []
+    exts = tuple(e.lower() for e in extensions)
+    for p in paths:
+        p = Path(p)
+        if p.is_dir():
+            for child in sorted(p.rglob("*")):
+                if child.is_file() and child.suffix.lower() in exts:
+                    out.append(child)
+        elif p.is_file():
+            out.append(p)
+        else:
+            print(f"[1] warning: local path does not exist: {p}", file=sys.stderr)
+    return out
+
+
+def phase1_collect_local(local_inputs: dict[str, list[Path]]) -> dict[str, list[Path]]:
+    """Skip-download counterpart of `phase1_download`. Returns the same
+    `{dataset: [files...]}` shape from user-supplied paths."""
+    result: dict[str, list[Path]] = {}
+    for ds, paths in local_inputs.items():
+        if not paths:
+            continue
+        exts = _LOCAL_EXT_BY_DATASET.get(ds, (".tif", ".tiff"))
+        files = _collect_local_files(paths, exts)
+        result[ds] = files
+        print(f"[1] {ds} (local): {len(files)} file(s)")
+        if not files:
+            print(f"[1] warning: no {exts} files found for {ds} under {paths}",
+                  file=sys.stderr)
     return result
 
 
@@ -169,8 +225,27 @@ def _bbox_utm32n_for_polygon(poly_wkt: str) -> tuple[float, float, float, float]
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--region", required=True, help="Named region from region_presets.")
+    ap.add_argument("--region", default=None,
+                    help="Named region from region_presets. Required unless "
+                         "--bbox-utm32n is supplied alongside --skip-download.")
+    ap.add_argument("--bbox-utm32n", nargs=4, type=float, metavar=("XMIN", "YMIN", "XMAX", "YMAX"),
+                    help="Explicit AOI bbox in EPSG:25832 metres. Overrides "
+                         "the bbox derived from --region when supplied.")
     ap.add_argument("--datasets", nargs="+", default=["dgm1", "dop40", "lod2"])
+    ap.add_argument("--skip-download", action="store_true",
+                    help="Skip phase 1 entirely and ingest already-downloaded "
+                         "tiles via --local-dgm / --local-dop / --local-lod2 "
+                         "(useful behind a proxy, or when fetching manually "
+                         "from the LDBV portal).")
+    ap.add_argument("--local-dgm", nargs="+", type=Path, default=[],
+                    help="Files or directories with DGM .tif tiles "
+                         "(implies --skip-download).")
+    ap.add_argument("--local-dop", nargs="+", type=Path, default=[],
+                    help="Files or directories with DOP orthophoto .tif tiles "
+                         "(implies --skip-download).")
+    ap.add_argument("--local-lod2", nargs="+", type=Path, default=[],
+                    help="Files or directories with LoD2 .gml/.xml/.zip files "
+                         "(implies --skip-download).")
     ap.add_argument("--engine", default="BLENDER_EEVEE_NEXT")
     ap.add_argument("--camera-preset", default="cinematic-establishing",
                     choices=["fpv-walk", "fpv-bike", "low-drone", "mid-drone",
@@ -189,24 +264,57 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--data-dir", type=Path, default=ROOT / "data")
     args = ap.parse_args(argv)
 
-    poly = polygon_for_region(args.region)
-    bbox = _bbox_utm32n_for_polygon(poly)
-    print(f"Region {args.region!r} bbox UTM32N: {bbox}")
+    skip_download = args.skip_download or any(
+        [args.local_dgm, args.local_dop, args.local_lod2]
+    )
+
+    # Resolve bbox: explicit --bbox-utm32n wins; otherwise derive from --region.
+    poly: Optional[str] = None
+    if args.region:
+        poly = polygon_for_region(args.region)
+    if args.bbox_utm32n:
+        bbox = tuple(args.bbox_utm32n)  # type: ignore[assignment]
+        source = "explicit"
+    elif poly is not None:
+        bbox = _bbox_utm32n_for_polygon(poly)
+        source = f"region {args.region!r}"
+    else:
+        ap.error("must supply --region (or --bbox-utm32n with --skip-download)")
+    print(f"AOI bbox UTM32N ({source}): {bbox}")
+
+    if not skip_download and poly is None:
+        ap.error("--region is required to download tiles; use --skip-download "
+                 "with --local-* paths if you've fetched the data yourself")
 
     raw = args.data_dir / "raw"
     proc = args.data_dir / "processed"
-    downloads = phase1_download(poly, args.datasets, raw)
+    if skip_download:
+        # Auto-fall-back to data/raw/<ds>/ if the user passed --skip-download
+        # without explicit local paths (lets you re-run after a prior download).
+        local_inputs: dict[str, list[Path]] = {
+            "dgm1":  list(args.local_dgm)  or ([raw / "dgm1"]  if (raw / "dgm1").is_dir() else []),
+            "dop40": list(args.local_dop)  or ([raw / "dop40"] if (raw / "dop40").is_dir() else []),
+            "dop20": ([raw / "dop20"] if (raw / "dop20").is_dir() and not args.local_dop else []),
+            "lod2":  list(args.local_lod2) or ([raw / "lod2"]  if (raw / "lod2").is_dir() else []),
+        }
+        downloads = phase1_collect_local(local_inputs)
+    else:
+        downloads = phase1_download(poly, args.datasets, raw)
+
     heightmap, ortho_dir = phase2_preprocess(downloads, bbox, proc)
     if heightmap is None:
-        print("[!] no DGM1 downloaded — cannot build terrain", file=sys.stderr)
+        print("[!] no DGM1 tiles available — cannot build terrain "
+              "(supply --local-dgm or run without --skip-download)",
+              file=sys.stderr)
         return 1
     cityjson = phase3_lod2(downloads, proc)
     waypoints = phase4_synthetic_waypoints(
         bbox, args.data_dir / "flight_path.csv",
         preset_name=args.camera_preset,
     )
-    out_blend = args.data_dir / f"scene_{args.region}.blend"
-    render_png = args.data_dir / f"render_{args.region}.png" if args.render_preview else None
+    region_tag = args.region or "custom"
+    out_blend = args.data_dir / f"scene_{region_tag}.blend"
+    render_png = args.data_dir / f"render_{region_tag}.png" if args.render_preview else None
     return phase5_blender(heightmap, ortho_dir, cityjson, waypoints, bbox,
                           out_blend, render_png, engine=args.engine,
                           enable=args.enable,
