@@ -119,18 +119,23 @@ my_tiles/
     └── 32_690_5333.zip
 ```
 
-### Step 3 — run the pipeline
+### Step 3 — run the pipeline (zero-config)
 
 ```bash
-python workflows/full_pipeline.py --skip-download --region muc-sued-4x2 \
+python workflows/full_pipeline.py --skip-download \
     --local-dgm  my_tiles/dgm \
     --local-dop  my_tiles/dop \
     --local-lod2 my_tiles/lod2 \
     --render-preview
 ```
 
-Or, if your AOI isn't one of the named region presets, supply an explicit
-bbox in EPSG:25832 (UTM zone 32N) metres:
+That's it. No `--region`, no bounding-box arithmetic. The AOI is read
+straight from the union of the supplied DGM GeoTIFFs' metadata. Tiles in
+a different CRS get reprojected to EPSG:25832 (UTM 32N) automatically.
+
+If you need to override the auto-derived AOI (cropping the scene to a
+sub-rectangle of your tiles, for example), pass `--bbox-utm32n` and it
+wins over both auto-bbox and `--region`:
 
 ```bash
 python workflows/full_pipeline.py --skip-download \
@@ -141,7 +146,7 @@ python workflows/full_pipeline.py --skip-download \
 
 Outputs land in `data/scene_<region>.blend` (+ `render_<region>.png`
 when `--render-preview` is on). Region tag falls back to `custom` when
-you used `--bbox-utm32n` without `--region`.
+you didn't use `--region`.
 
 ### Cheat sheet — flag interactions
 
@@ -149,10 +154,10 @@ you used `--bbox-utm32n` without `--region`.
 - `--skip-download` with no `--local-*` flags falls back to
   `data/raw/<dataset>/`. Useful for re-running preprocessing after a
   one-time download without hitting the network again.
-- `--bbox-utm32n` overrides the bbox derived from `--region` when both
-  are supplied.
-- `--region` is required only if you neither pass `--bbox-utm32n` nor
-  rely on the `data/raw/` fallback.
+- **AOI resolution priority** (highest first):
+  `--bbox-utm32n` → `--region` → auto-derived from DGM GeoTIFF tags.
+- `--region` is only ever required when **downloading** (phase 1 needs
+  the polygon to know which 1 km tiles to fetch).
 
 ### Verifying the offline mode is wired correctly
 
@@ -180,6 +185,12 @@ haven't been initialised yet.
   to add buildings.
 - **Render looks oddly cropped** — your tiles don't fully cover the
   bbox. Either widen the tile set or shrink `--bbox-utm32n`.
+- **`ValueError: ... is not a georeferenced GeoTIFF`** — the auto-bbox
+  reader couldn't find ModelTiepoint / ModelPixelScale tags. Your
+  `.tif` is a plain TIFF without geo-metadata (often the case after
+  `gdal_translate` without `-co GEOTIFF=YES`, or files exported as
+  PNG-then-renamed). Fix: re-export with georeference, ship a `.jgw`
+  world file alongside, or supply `--bbox-utm32n` manually.
 - **`ModuleNotFoundError: backend`** — you tried to run without
   `--skip-download` but the `OpenMap_Unifier` submodule isn't checked
   out. Either `git submodule update --init`, or stick to skip-download

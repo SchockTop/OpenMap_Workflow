@@ -16,6 +16,26 @@ import pytest
 from workflows import full_pipeline as fp
 
 
+def _write_geotiff(path: Path,
+                   *,
+                   x0: float, y0: float,
+                   width: int = 100, height: int = 100,
+                   pixel_size: float = 1.0,
+                   epsg: Optional[int] = 25832) -> Path:
+    """Write a tiny synthetic GeoTIFF with the requested tags. The pixel
+    payload is meaningless — only the metadata tags matter for these tests."""
+    from PIL import Image, TiffImagePlugin
+    img = Image.new("L", (width, height), color=0)
+    info = TiffImagePlugin.ImageFileDirectory_v2()
+    info[33550] = (pixel_size, pixel_size, 0.0)              # ModelPixelScale
+    info[33922] = (0.0, 0.0, 0.0, x0, y0, 0.0)               # ModelTiepoint
+    if epsg is not None:
+        # Minimal GeoKeyDirectory: one inline ProjectedCSTypeGeoKey entry.
+        info[34735] = (1, 1, 0, 1, 3072, 0, 1, epsg)
+    img.save(path, tiffinfo=info)
+    return path
+
+
 # ---------------------------------------------------------------------------
 # _collect_local_files
 # ---------------------------------------------------------------------------
@@ -237,3 +257,138 @@ def test_main_help_runs_without_submodules(capsys):
     assert "--skip-download" in captured.out
     assert "--local-dgm" in captured.out
     assert "--bbox-utm32n" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# Auto-bbox: read GeoTIFF metadata and union tile extents
+# ---------------------------------------------------------------------------
+
+def test_read_geotiff_bbox_round_trip(tmp_path: Path):
+    """A 1000x500 tile @ 1 m/px with tiepoint (690000, 5333000) covers
+    (690000..691000, 5332500..5333000) in EPSG:25832."""
+    tif = _write_geotiff(tmp_path / "tile.tif",
+                         x0=690000.0, y0=5333000.0,
+                         width=1000, height=500, pixel_size=1.0,
+                         epsg=25832)
+    xmin, ymin, xmax, ymax, epsg = fp._read_geotiff_bbox(tif)
+    assert epsg == 25832
+    assert (xmin, xmax) == (690000.0, 691000.0)
+    assert (ymin, ymax) == (5332500.0, 5333000.0)
+
+
+def test_read_geotiff_bbox_missing_tags_raises(tmp_path: Path):
+    """A plain (non-geo) TIFF must error clearly, not silently return zeros."""
+    from PIL import Image
+    tif = tmp_path / "plain.tif"
+    Image.new("L", (10, 10)).save(tif)
+    with pytest.raises(ValueError, match="not a georeferenced GeoTIFF"):
+        fp._read_geotiff_bbox(tif)
+
+
+def test_read_geotiff_bbox_no_crs_returns_none_epsg(tmp_path: Path):
+    tif = _write_geotiff(tmp_path / "no_crs.tif",
+                         x0=690000.0, y0=5333000.0, epsg=None)
+    *_, epsg = fp._read_geotiff_bbox(tif)
+    assert epsg is None
+
+
+def test_auto_bbox_unions_two_tiles_horizontal(tmp_path: Path):
+    """Two adjacent 1 km tiles → union covers a 2 km horizontal strip."""
+    a = _write_geotiff(tmp_path / "a.tif", x0=690000.0, y0=5333000.0,
+                       width=1000, height=1000, pixel_size=1.0)
+    b = _write_geotiff(tmp_path / "b.tif", x0=691000.0, y0=5333000.0,
+                       width=1000, height=1000, pixel_size=1.0)
+    bbox = fp.auto_bbox_from_tiles([a, b])
+    assert bbox == (690000.0, 5332000.0, 692000.0, 5333000.0)
+
+
+def test_auto_bbox_handles_non_contiguous_tiles(tmp_path: Path):
+    """Tiles with a gap between them → union is the outer rectangle."""
+    a = _write_geotiff(tmp_path / "a.tif", x0=690000.0, y0=5333000.0,
+                       width=1000, height=1000)
+    b = _write_geotiff(tmp_path / "b.tif", x0=695000.0, y0=5340000.0,
+                       width=1000, height=1000)
+    xmin, ymin, xmax, ymax = fp.auto_bbox_from_tiles([a, b])
+    assert (xmin, xmax) == (690000.0, 696000.0)
+    assert (ymin, ymax) == (5332000.0, 5340000.0)
+
+
+def test_auto_bbox_empty_list_raises():
+    with pytest.raises(ValueError, match="at least one tile"):
+        fp.auto_bbox_from_tiles([])
+
+
+def test_auto_bbox_warns_on_missing_crs(tmp_path: Path, capsys):
+    tif = _write_geotiff(tmp_path / "no_crs.tif", x0=690000.0, y0=5333000.0,
+                        epsg=None)
+    fp.auto_bbox_from_tiles([tif])
+    err = capsys.readouterr().err
+    assert "no CRS" in err
+
+
+def test_auto_bbox_reprojects_mismatched_epsg(tmp_path: Path, capsys):
+    """A WGS84 (EPSG:4326) tile gets reprojected into EPSG:25832."""
+    # Munich Marienplatz roughly: lon 11.576, lat 48.137. The tile spans
+    # 0.01° in each direction so the projected bbox is ~700m wide.
+    tif = _write_geotiff(tmp_path / "wgs84.tif",
+                         x0=11.575, y0=48.138,
+                         width=100, height=100, pixel_size=0.0001,
+                         epsg=4326)
+    xmin, ymin, xmax, ymax = fp.auto_bbox_from_tiles([tif])
+    # Munich UTM32N is around (691000, 5334000).
+    assert 690000 < xmin < 692000
+    assert 5333000 < ymin < 5335000
+    assert "reprojected" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# main() — auto-bbox kicks in when no region/bbox supplied
+# ---------------------------------------------------------------------------
+
+def test_main_auto_bbox_from_local_dgm_tiles(tmp_path: Path, stub_phases):
+    """The headline UX: drop tiles in a folder, run with --skip-download,
+    no --region, no --bbox-utm32n. Pipeline derives the AOI from the tiles."""
+    dgm = tmp_path / "dgm"; dgm.mkdir()
+    _write_geotiff(dgm / "a.tif", x0=690000.0, y0=5333000.0,
+                   width=1000, height=1000)
+    _write_geotiff(dgm / "b.tif", x0=691000.0, y0=5333000.0,
+                   width=1000, height=1000)
+    rc = fp.main([
+        "--skip-download",
+        "--local-dgm", str(dgm),
+        "--data-dir", str(tmp_path / "data"),
+    ])
+    assert rc == 0
+    assert stub_phases["bbox"] == (690000.0, 5332000.0, 692000.0, 5333000.0)
+
+
+def test_main_auto_bbox_errors_when_dgm_tiles_have_no_georef(tmp_path: Path,
+                                                              stub_phases):
+    """A plain (non-geo) TIFF can't be auto-bboxed; the user must supply
+    --bbox-utm32n explicitly."""
+    from PIL import Image
+    dgm = tmp_path / "dgm"; dgm.mkdir()
+    Image.new("L", (100, 100)).save(dgm / "plain.tif")
+    with pytest.raises(ValueError, match="not a georeferenced GeoTIFF"):
+        fp.main([
+            "--skip-download",
+            "--local-dgm", str(dgm),
+            "--data-dir", str(tmp_path / "data"),
+        ])
+
+
+def test_main_explicit_bbox_skips_auto_bbox_even_with_local_dgm(tmp_path: Path,
+                                                                stub_phases):
+    """If the user supplies both --bbox-utm32n and --local-dgm, the explicit
+    bbox wins and we don't bother reading GeoTIFF tags."""
+    dgm = tmp_path / "dgm"; dgm.mkdir()
+    # Note: NOT a real GeoTIFF — proves auto-bbox path was skipped.
+    (dgm / "garbage.tif").write_bytes(b"not a tiff")
+    rc = fp.main([
+        "--skip-download",
+        "--bbox-utm32n", "100", "200", "300", "400",
+        "--local-dgm", str(dgm),
+        "--data-dir", str(tmp_path / "data"),
+    ])
+    assert rc == 0
+    assert stub_phases["bbox"] == (100.0, 200.0, 300.0, 400.0)

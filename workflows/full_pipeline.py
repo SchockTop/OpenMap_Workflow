@@ -11,6 +11,11 @@ Usage (download + render):
     python workflows/full_pipeline.py --region muc-sued-4x2 \\
         --datasets dgm1 dop40 lod2 --render-preview
 
+Usage (zero config — auto-derive AOI from your tiles' GeoTIFF metadata):
+    python workflows/full_pipeline.py --skip-download \\
+        --local-dgm path/to/dgm_dir --render-preview
+    # The AOI bbox is read from the union of the DGM GeoTIFF extents.
+
 Usage (offline / behind a proxy — bring your own tiles):
     python workflows/full_pipeline.py --skip-download --region muc-sued-4x2 \\
         --local-dgm  path/to/dgm_dir \\
@@ -229,14 +234,125 @@ def _bbox_utm32n_for_polygon(poly_wkt: str) -> tuple[float, float, float, float]
     return proj.bounds  # (xmin, ymin, xmax, ymax)
 
 
+# ---------------------------------------------------------------------------
+# Auto-bbox: derive the AOI from the union of supplied GeoTIFF tile extents
+# so the user can drop tiles into a folder and run with no --region/--bbox.
+# Pure-Python: reads GeoTIFF tags via PIL (no rasterio/GDAL dependency).
+# ---------------------------------------------------------------------------
+
+# GeoTIFF tag IDs we care about (TIFF 6.0 + GeoTIFF 1.0).
+_TAG_MODEL_PIXEL_SCALE = 33550   # (sx, sy, sz)
+_TAG_MODEL_TIEPOINT = 33922      # (i, j, k, x, y, z)  — usually pixel (0,0) -> world (x,y)
+_TAG_GEO_KEY_DIRECTORY = 34735   # uint16[] with EPSG / projection info
+_GEOKEY_PROJECTED_CS_TYPE = 3072  # ProjectedCSTypeGeoKey — its value is the EPSG code
+
+
+def _parse_epsg_from_geokeys(geokeys) -> Optional[int]:
+    """Extract the projected-CS EPSG code from a GeoKeyDirectoryTag value.
+
+    Layout (per GeoTIFF 1.0 §2.4): first 4 entries are header
+    (KeyDirectoryVersion, KeyRevision, MinorRevision, NumberOfKeys),
+    then NumberOfKeys × 4 entries (KeyID, TIFFTagLocation, Count, Value).
+    We only look for ProjectedCSTypeGeoKey (3072) stored inline
+    (TIFFTagLocation == 0).
+    """
+    if not geokeys or len(geokeys) < 8:
+        return None
+    n_keys = int(geokeys[3])
+    for i in range(n_keys):
+        off = 4 + i * 4
+        if off + 3 >= len(geokeys):
+            break
+        key_id = int(geokeys[off])
+        tiff_tag_loc = int(geokeys[off + 1])
+        value = int(geokeys[off + 3])
+        if key_id == _GEOKEY_PROJECTED_CS_TYPE and tiff_tag_loc == 0:
+            return value
+    return None
+
+
+def _read_geotiff_bbox(tif_path: Path) -> tuple[float, float, float, float, Optional[int]]:
+    """Return (xmin, ymin, xmax, ymax, epsg) from a GeoTIFF.
+
+    Raises ValueError when the file lacks the GeoTIFF tiepoint/pixel-scale
+    tags (i.e. it isn't actually georeferenced).
+    """
+    from PIL import Image
+    with Image.open(tif_path) as img:
+        tags = img.tag_v2
+        if _TAG_MODEL_TIEPOINT not in tags or _TAG_MODEL_PIXEL_SCALE not in tags:
+            raise ValueError(
+                f"{tif_path.name} is not a georeferenced GeoTIFF "
+                f"(missing tiepoint/pixel-scale tags). Either source the data "
+                f"as a real GeoTIFF, or supply --bbox-utm32n explicitly."
+            )
+        tiepoint = tags[_TAG_MODEL_TIEPOINT]
+        scale = tags[_TAG_MODEL_PIXEL_SCALE]
+        width, height = img.size
+        # Tiepoint convention: (i, j, k, x, y, z) — pixel (i,j) maps to world (x,y).
+        # For Bayern OpenData this is always (0, 0, 0, x_top_left, y_top_left, 0).
+        x0, y0 = float(tiepoint[3]), float(tiepoint[4])
+        sx, sy = float(scale[0]), float(scale[1])
+        xmin = x0
+        xmax = x0 + width * sx
+        ymax = y0
+        ymin = y0 - height * sy   # north-up: tiepoint Y is the TOP of the raster
+        epsg = _parse_epsg_from_geokeys(tags.get(_TAG_GEO_KEY_DIRECTORY))
+        return xmin, ymin, xmax, ymax, epsg
+
+
+def auto_bbox_from_tiles(tifs: list[Path],
+                          target_epsg: int = 25832
+                          ) -> tuple[float, float, float, float]:
+    """Compute the union bbox of a set of GeoTIFFs in `target_epsg` metres.
+
+    Tiles in a different CRS get their corners reprojected via pyproj.
+    Tiles with no CRS tag are assumed to already match `target_epsg` (a
+    warning is printed). Raises ValueError on an empty list or if no tile
+    has valid GeoTIFF tags.
+    """
+    if not tifs:
+        raise ValueError("auto_bbox_from_tiles needs at least one tile path")
+    xmins: list[float] = []
+    ymins: list[float] = []
+    xmaxs: list[float] = []
+    ymaxs: list[float] = []
+    mismatched: list[tuple[Path, int]] = []
+    missing_crs: list[Path] = []
+    for tif in tifs:
+        xmin, ymin, xmax, ymax, epsg = _read_geotiff_bbox(tif)
+        if epsg is not None and epsg != target_epsg:
+            mismatched.append((tif, epsg))
+            from pyproj import Transformer
+            t = Transformer.from_crs(f"EPSG:{epsg}", f"EPSG:{target_epsg}", always_xy=True)
+            corners = [t.transform(x, y) for x in (xmin, xmax) for y in (ymin, ymax)]
+            xs = [c[0] for c in corners]
+            ys = [c[1] for c in corners]
+            xmin, xmax = min(xs), max(xs)
+            ymin, ymax = min(ys), max(ys)
+        elif epsg is None:
+            missing_crs.append(tif)
+        xmins.append(xmin); ymins.append(ymin)
+        xmaxs.append(xmax); ymaxs.append(ymax)
+    if mismatched:
+        sample = ", ".join(f"{p.name}=EPSG:{e}" for p, e in mismatched[:3])
+        print(f"[auto-bbox] {len(mismatched)} tile(s) reprojected to "
+              f"EPSG:{target_epsg} ({sample}{'…' if len(mismatched) > 3 else ''})")
+    if missing_crs:
+        print(f"[auto-bbox] warning: {len(missing_crs)} tile(s) have no CRS "
+              f"tag; assuming EPSG:{target_epsg}", file=sys.stderr)
+    return (min(xmins), min(ymins), max(xmaxs), max(ymaxs))
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--region", default=None,
-                    help="Named region from region_presets. Required unless "
-                         "--bbox-utm32n is supplied alongside --skip-download.")
+                    help="Named region from region_presets. Required only when "
+                         "downloading; with --skip-download the AOI is "
+                         "auto-derived from the supplied DGM GeoTIFFs.")
     ap.add_argument("--bbox-utm32n", nargs=4, type=float, metavar=("XMIN", "YMIN", "XMAX", "YMAX"),
                     help="Explicit AOI bbox in EPSG:25832 metres. Overrides "
-                         "the bbox derived from --region when supplied.")
+                         "both --region and the auto-bbox-from-tiles fallback.")
     ap.add_argument("--datasets", nargs="+", default=["dgm1", "dop40", "lod2"])
     ap.add_argument("--skip-download", action="store_true",
                     help="Skip phase 1 entirely and ingest already-downloaded "
@@ -274,26 +390,17 @@ def main(argv: list[str] | None = None) -> int:
         [args.local_dgm, args.local_dop, args.local_lod2]
     )
 
-    # Resolve bbox: explicit --bbox-utm32n wins; otherwise derive from --region.
+    raw = args.data_dir / "raw"
+    proc = args.data_dir / "processed"
+
+    # Phase 1 (or its skip-download counterpart) runs first now, because we
+    # need the actual tile list to auto-derive the bbox when neither
+    # --region nor --bbox-utm32n was supplied.
     poly: Optional[str] = None
     if args.region:
         poly = polygon_for_region(args.region)
-    if args.bbox_utm32n:
-        bbox = tuple(args.bbox_utm32n)  # type: ignore[assignment]
-        source = "explicit"
-    elif poly is not None:
-        bbox = _bbox_utm32n_for_polygon(poly)
-        source = f"region {args.region!r}"
-    else:
-        ap.error("must supply --region (or --bbox-utm32n with --skip-download)")
-    print(f"AOI bbox UTM32N ({source}): {bbox}")
 
-    if not skip_download and poly is None:
-        ap.error("--region is required to download tiles; use --skip-download "
-                 "with --local-* paths if you've fetched the data yourself")
-
-    raw = args.data_dir / "raw"
-    proc = args.data_dir / "processed"
+    downloads: dict[str, list[Path]]
     if skip_download:
         # Auto-fall-back to data/raw/<ds>/ if the user passed --skip-download
         # without explicit local paths (lets you re-run after a prior download).
@@ -305,7 +412,26 @@ def main(argv: list[str] | None = None) -> int:
         }
         downloads = phase1_collect_local(local_inputs)
     else:
+        if poly is None:
+            ap.error("--region is required to download tiles; use --skip-download "
+                     "with --local-* paths if you've fetched the data yourself")
         downloads = phase1_download(poly, args.datasets, raw)
+
+    # Resolve bbox: explicit --bbox-utm32n wins; --region next; auto from
+    # the supplied DGM tiles' GeoTIFF metadata as a final fallback.
+    if args.bbox_utm32n:
+        bbox = tuple(args.bbox_utm32n)  # type: ignore[assignment]
+        source = "explicit"
+    elif poly is not None:
+        bbox = _bbox_utm32n_for_polygon(poly)
+        source = f"region {args.region!r}"
+    elif skip_download and downloads.get("dgm1"):
+        bbox = auto_bbox_from_tiles(downloads["dgm1"])
+        source = f"auto from {len(downloads['dgm1'])} DGM tile(s)"
+    else:
+        ap.error("must supply one of: --region, --bbox-utm32n, or "
+                 "--local-dgm with georeferenced GeoTIFFs")
+    print(f"AOI bbox UTM32N ({source}): {bbox}")
 
     heightmap, ortho_dir = phase2_preprocess(downloads, bbox, proc)
     if heightmap is None:
