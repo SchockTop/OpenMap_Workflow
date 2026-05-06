@@ -65,17 +65,30 @@ After merging the ground-layer branch, this remains unresolved:
 
 ## Submodule: `SchockTop/OpenMap_Unifier`
 
-Umbrella pin: `e69c9353` (= upstream `main` tip — fully synced).
+Umbrella pin: **`d63fbec`** (= upstream `main` tip — fully synced as of
+2026-05-06, after PR #14 landed the mirror-fallback fix).
 
 ### Branches with unmerged work
 
 | Branch | Ahead of main | Behind main | Status | Notes |
 |---|---|---|---|---|
-| `claude/fix-dgm5-lod2-downloads-wcK4n` | 2 (`33957da`, `b0763cb`) | 12 | 🔴 | The DGM5 / LoD2 / DGM1 404 fix. Conflicts with main on `backend/downloader.py` — both sides refactored the same file independently. Main went incremental (6 small fixes); this branch went big (per-dataset URL layout + mirror fallback + `backend.api` + pytest + CI). |
-| `claude/fix-height-data-download-37edF` | 0 | 2 | — | Fully merged into main. Safe to delete. |
-| `claude/fix-osm-406-error-ahHPh` | 0 | 17 | — | Fully merged. Safe to delete. |
-| `claude/add-file-format-selection-hnXRe` | 0 | 42 | — | Fully merged. Safe to delete. |
-| `auto/proxy-bayern-ux-rework` | 0 | 31 | — | Fully merged. Safe to delete. |
+| `claude/fix-dgm5-lod2-downloads-wcK4n` | 2 (`33957da`, `b0763cb`) | 14 | 🔴 | The bigger per-dataset URL-layout refactor + `backend.api` + `probe_dataset`. Conflicts with main on `backend/downloader.py`. The most-needed piece (mirror fallback) was extracted into PR #14 and merged separately, so this branch is now lower priority. Decide: extract the rest piecemeal, or rebase the whole thing. |
+| `claude/implement-todo-tasks-A1VWq` | 0 | 0 | — | Was the source of PR #14. Fully merged via `d63fbec`. Safe to delete. |
+| `claude/fix-height-data-download-37edF` | 0 | 4 | — | Fully merged into main. Safe to delete. |
+| `claude/fix-osm-406-error-ahHPh` | 0 | 19 | — | Fully merged. Safe to delete. |
+| `claude/add-file-format-selection-hnXRe` | 0 | 44 | — | Fully merged. Safe to delete. |
+| `auto/proxy-bayern-ux-rework` | 0 | 33 | — | Fully merged. Safe to delete. |
+
+### The 404 problem — current state
+
+PR #14 (`d63fbec`) landed:
+- `5ac2f7e` — fix(proxy): persist host/username/auth across mode switches
+- `e5071e0` — fix(bayern): mirror fallback so height tiles survive a flaky mirror
+
+The mirror-fallback piece was the single most useful chunk of the stranded
+fix branch. With it in main, a single dead Bayern mirror no longer kills
+a download batch. The umbrella's `README.md` "Known issues" has been
+updated to reflect this.
 
 ### The 404 problem — current state
 

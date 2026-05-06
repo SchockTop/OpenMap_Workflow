@@ -328,12 +328,17 @@ operator in that submodule.
 
 ## Known issues
 
-- **DGM1 + LoD2 endpoints return HTTP 404** from `download1.bayernwolke.de`
-  for the URL pattern OpenMap_Unifier's `generate_1km_grid_files` produces
-  (`/a/dgm1/data/<tile>.tif`, `/a/lod2/data/<tile>.zip`). Documented in
-  `OpenMap_Unifier/DOCUMENTARY.md`. **DOP20 + DOP40 work**.
-  - Workaround until the real URL pattern is found: fetch a `.meta4` file
-    manually from the LDBV portal and use `MapDownloader.parse_metalink()`.
+- **DGM1 / LoD2 mirror flakiness.** The Bayern endpoints occasionally
+  return 4xx/5xx on a given mirror. As of `OpenMap_Unifier @ d63fbec`
+  (PR #14, merged 2026-05) the downloader transparently falls through
+  alternate `<url>` mirrors per file, so a single dead mirror no longer
+  kills a batch. If a tile still fails after exhausting mirrors,
+  fall back to the offline workflow (`--skip-download` + `--local-*`)
+  documented above.
+- **The bigger per-dataset URL-layout refactor**
+  (`backend.api.probe_dataset` + `url_path` field) is still stranded on
+  the unmerged branch `claude/fix-dgm5-lod2-downloads-wcK4n` in
+  `SchockTop/OpenMap_Unifier`. Tracked in `TODO.md`.
 
 ## Submodule URLs
 
