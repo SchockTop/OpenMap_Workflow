@@ -33,15 +33,17 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "OpenMap_Unifier"))
 sys.path.insert(0, str(ROOT / "openmap_blender_tools"))
 
-from backend.downloader import MapDownloader  # noqa: E402
-from blender_tools.geo_import import dgm_tif_to_heightmap, dop_to_udim_tiles  # noqa: E402
-from blender_tools.citygml_import import gml_to_cityjson_pure  # noqa: E402
+# Submodule-bound imports are deferred into the phase functions so that
+# `--skip-download` mode (and `--help`, and the unit tests) work even when the
+# OpenMap_Unifier submodule isn't checked out. Only `region_presets` lives in
+# this repo and is always importable.
 from workflows.region_presets import polygon_for_region  # noqa: E402
 
 BLENDER = Path(r"C:/Program Files/Blender Foundation/Blender 5.1/blender.exe")
 
 
 def phase1_download(poly_wkt: str, datasets: list[str], out_root: Path) -> dict[str, list[Path]]:
+    from backend.downloader import MapDownloader  # lazy: needs OpenMap_Unifier
     out_root.mkdir(parents=True, exist_ok=True)
     result: dict[str, list[Path]] = {}
     for ds in datasets:
@@ -106,6 +108,8 @@ def phase1_collect_local(local_inputs: dict[str, list[Path]]) -> dict[str, list[
 def phase2_preprocess(downloads: dict[str, list[Path]],
                       bbox_utm32n: tuple[float, float, float, float],
                       out_root: Path) -> tuple[Optional[Path], Optional[Path]]:
+    # Lazy: needs the openmap_blender_tools submodule (vendored GDAL).
+    from blender_tools.geo_import import dgm_tif_to_heightmap, dop_to_udim_tiles
     out_root.mkdir(parents=True, exist_ok=True)
     heightmap = None
     if downloads.get("dgm1"):
@@ -138,6 +142,8 @@ def phase3_lod2(downloads: dict[str, list[Path]], out_root: Path) -> Optional[Pa
     gmls = downloads.get("lod2", [])
     if not gmls:
         return None
+    # Lazy: needs openmap_blender_tools.
+    from blender_tools.citygml_import import gml_to_cityjson_pure
     out_root.mkdir(parents=True, exist_ok=True)
     out = out_root / "buildings.cityjson"
     gml_to_cityjson_pure(gmls, out)

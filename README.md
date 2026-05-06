@@ -63,6 +63,10 @@ python workflows/full_pipeline.py --region muc-sued-4x2 \
 # OR: open Blender, hit N-panel "OpenMap" -> "Build cinematic scene from region"
 ```
 
+> **Behind a corporate proxy or air-gapped?** Skip the auto-download —
+> see [Offline / behind-a-proxy: bring your own tiles](#offline--behind-a-proxy-bring-your-own-tiles)
+> for fetching tiles manually and feeding them in with `--skip-download`.
+
 **Available regions:** `muc-marienplatz-50m` (1 tile, ~30 s), `muc-sued-4x2` (~10 min),
 `muc-sued-10x4` (cinematic 10×4 km baseline, ~30 min, ~3 GB).
 
@@ -72,18 +76,52 @@ python workflows/full_pipeline.py --region muc-sued-4x2 \
 ## Offline / behind-a-proxy: bring your own tiles
 
 If your network blocks `download1.bayernwolke.de` / `geodaten.bayern.de`
-(corporate proxy, air-gapped machine, …), fetch the tiles yourself — for
-example by browsing the [LDBV OpenData portal](https://geodaten.bayern.de/opengeodata/)
-and downloading directly, or by feeding the URL list into a proxy-aware
-downloader like `curl --proxy …` or `aria2c` — then point the pipeline at
-the local files with `--skip-download`:
+(corporate proxy, air-gapped machine, hotel Wi-Fi…) the pipeline can still
+run — you fetch the tiles yourself by whatever means, then feed them in with
+`--skip-download`. No code changes required.
+
+### Step 1 — get the tiles
+
+Pick **one** of these, whichever your environment allows:
+
+| Method | When to use |
+|---|---|
+| **Browser (manual)** | Open [geodaten.bayern.de/opengeodata](https://geodaten.bayern.de/opengeodata/), pick the dataset, draw or enter your AOI, download the tiles. Slowest but always works. |
+| **`curl` / `wget` through your proxy** | `export HTTPS_PROXY=http://user:pass@proxy:8080` then `curl -O <url>` for each tile. |
+| **`aria2c`** | Faster bulk download if you can extract a URL list. Respects `HTTPS_PROXY`. |
+| **Sneakernet / shared drive** | Have a colleague run a download somewhere with open egress, then copy the resulting `data/raw/` tree to your machine. |
+
+You need **at minimum** DGM1 (heightmap). DOP (orthophoto) and LoD2
+(buildings) are optional — the pipeline degrades gracefully and skips
+features whose inputs are missing.
+
+### Step 2 — drop the files into a folder
+
+The layout is up to you. The pipeline accepts files OR directories
+(scanned recursively) and matches by extension:
+
+| Dataset | Flag | File extensions accepted |
+|---|---|---|
+| 1 m heightmap (DGM1) | `--local-dgm` | `*.tif`, `*.tiff` |
+| Orthophoto (DOP20/40) | `--local-dop` | `*.tif`, `*.tiff` |
+| LoD2 buildings | `--local-lod2` | `*.gml`, `*.xml`, `*.zip` (zipped GML stays zipped) |
+
+A typical layout:
+
+```
+my_tiles/
+├── dgm/
+│   ├── 32_690_5333.tif
+│   └── 32_691_5333.tif
+├── dop/
+│   └── 32_690_5333.tif
+└── lod2/
+    └── 32_690_5333.zip
+```
+
+### Step 3 — run the pipeline
 
 ```bash
-# Drop your tiles into any layout you like, e.g.:
-#   my_tiles/dgm/*.tif
-#   my_tiles/dop/*.tif
-#   my_tiles/lod2/*.gml      (or .zip — the GML can stay zipped)
-
 python workflows/full_pipeline.py --skip-download --region muc-sued-4x2 \
     --local-dgm  my_tiles/dgm \
     --local-dop  my_tiles/dop \
@@ -91,21 +129,61 @@ python workflows/full_pipeline.py --skip-download --region muc-sued-4x2 \
     --render-preview
 ```
 
-You can also skip the named region entirely and supply an explicit bbox in
-EPSG:25832 metres:
+Or, if your AOI isn't one of the named region presets, supply an explicit
+bbox in EPSG:25832 (UTM zone 32N) metres:
 
 ```bash
 python workflows/full_pipeline.py --skip-download \
     --bbox-utm32n 686000 5331000 690000 5333000 \
-    --local-dgm my_tiles/dgm --local-dop my_tiles/dop \
+    --local-dgm my_tiles/dgm \
     --render-preview
 ```
 
-`--skip-download` accepts files **or** directories (recursive) for each
-`--local-*` flag, and falls back to `data/raw/<dataset>/` if you've
-previously downloaded but want to re-run preprocessing without hitting the
-network again. DGM/DOP are matched by `*.tif`/`*.tiff`; LoD2 by
-`*.gml`/`*.xml`/`*.zip`.
+Outputs land in `data/scene_<region>.blend` (+ `render_<region>.png`
+when `--render-preview` is on). Region tag falls back to `custom` when
+you used `--bbox-utm32n` without `--region`.
+
+### Cheat sheet — flag interactions
+
+- Passing **any** `--local-*` flag implies `--skip-download` automatically.
+- `--skip-download` with no `--local-*` flags falls back to
+  `data/raw/<dataset>/`. Useful for re-running preprocessing after a
+  one-time download without hitting the network again.
+- `--bbox-utm32n` overrides the bbox derived from `--region` when both
+  are supplied.
+- `--region` is required only if you neither pass `--bbox-utm32n` nor
+  rely on the `data/raw/` fallback.
+
+### Verifying the offline mode is wired correctly
+
+Before downloading hundreds of MB, sanity-check the plumbing:
+
+```bash
+# 1. CLI parses cleanly (no submodules required for --help):
+python workflows/full_pipeline.py --help
+
+# 2. Run the offline-mode unit tests:
+python -m pytest workflows/tests/test_full_pipeline_local.py -v
+# -> 15 passed
+```
+
+Both should succeed even on a fresh checkout where the submodules
+haven't been initialised yet.
+
+### Common pitfalls
+
+- **`[!] no DGM1 tiles available`** — the pipeline could not find any
+  `*.tif` files under what you passed to `--local-dgm` (or under
+  `data/raw/dgm1/`). Double-check the path and extension.
+- **Buildings missing from the render** — LoD2 input was empty. The
+  scene still builds; you just get terrain + ortho. Pass `--local-lod2`
+  to add buildings.
+- **Render looks oddly cropped** — your tiles don't fully cover the
+  bbox. Either widen the tile set or shrink `--bbox-utm32n`.
+- **`ModuleNotFoundError: backend`** — you tried to run without
+  `--skip-download` but the `OpenMap_Unifier` submodule isn't checked
+  out. Either `git submodule update --init`, or stick to skip-download
+  mode.
 
 ## Known issues
 
