@@ -184,6 +184,56 @@ haven't been initialised yet.
   `--skip-download` but the `OpenMap_Unifier` submodule isn't checked
   out. Either `git submodule update --init`, or stick to skip-download
   mode.
+## Ground-layer audit (open question)
+
+The current `showcase/*.png` images do not visibly show a draped DOP / aerial
+photograph on the terrain — the "ground" reads as flat color or dark water.
+A blind per-image scorer (`workflows/blind_ground_detector.py`, knows nothing
+about which layer each image is) confirms this:
+
+```
+file                          hues   std edges  verdict
+04_feature_buildings.png         8   2.7 0.002  EMPTY
+06_feature_ground_shader.png     2   0.4 0.000  EMPTY
+05_feature_trees.png            15  27.5 0.021  FLAT
+07_feature_groundcover.png      20  27.8 0.100  FLAT
+01_poster.png                   50  69.0 0.289  FLAT
+03_altitude_comparison.png      58  65.1 0.157  FLAT
+```
+
+`workflows/test_progressive_layers.py` re-renders the same camera with one
+layer added at a time (sky → flat plane → **ortho drape** → heightmap →
+ground-shader → groundcover → trees → buildings → atmosphere) and runs the
+blind detector across the frames. Frame `02_ortho_drape.png` must score
+visibly higher than `01_terrain_flat.png`; if it doesn't, the orthophoto
+isn't reaching the terrain material and that's the bug to chase first.
+
+```bash
+python workflows/test_progressive_layers.py --region muc-marienplatz-50m
+# -> showcase/ground_layer_test/00_sky.png ... 08_atmosphere.png + verdict
+```
+
+**Headless plumbing run** (no Blender executable, no GPU, no Bayern data):
+`workflows/_headless_make_synth_data.py` generates a synthetic heightmap +
+a vivid synthetic UDIM ortho (`ortho.1001.jpg`), then
+`_headless_progressive.py` renders four frames using pip-installed `bpy`
+and Cycles CPU. Result, scored by the blind detector:
+
+```
+file                         hues   std edges  verdict
+00_sky.png                      2   0.3 0.000  EMPTY
+01_terrain_flat.png             6  10.0 0.002  FLAT
+02_ortho_drape.png             58  36.6 0.079  FLAT
+03_heightmap_plus_drape.png    82  38.6 0.275  GROUND_VISIBLE
+```
+
+Frame 02 jumps std 10→36, hues 6→58, edges 0.002→0.079 — the
+`apply_ortho_drape` code path works. So the missing ground in the
+existing `showcase/01_poster.png` etc. is **upstream of the drape
+function**: either the DOP tiles weren't downloaded, weren't passed to
+`_blender_assemble_full.py` via `--ortho-dir`, or were saved with a
+filename other than `ortho.<udim>.jpg`. Open the actual scene .blend
+and run `workflows/test_ortho_drape_present.py` against it to confirm.
 
 ## Known issues
 
