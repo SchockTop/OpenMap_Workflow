@@ -42,7 +42,7 @@ After merging the ground-layer branch, this remains unresolved:
 
 ---
 
-## Submodule: `Kleinschock/OpenMap_Unifier`
+## Submodule: `SchockTop/OpenMap_Unifier`
 
 Umbrella pin: `e69c9353` (= upstream `main` tip — fully synced).
 
@@ -84,11 +84,17 @@ report ("I still get 404 for DGM downloads") suggests these aren't enough.
 Resolving the conflict requires:
 - Network access to `download1.bayernwolke.de` to verify which strategy
   actually works (main's incremental fixes vs. the fix branch's refactor).
-- Push access to `Kleinschock/OpenMap_Unifier` (this session's GitHub MCP
+  **Confirmed unavailable from this sandbox** (2026-05-06 probe): every
+  Bayern endpoint returns HTTP 403 *host_not_allowed*, including the bare
+  hosts `download1.bayernwolke.de`, `download2.bayernwolke.de`, and
+  `geodaten.bayern.de`. This is a sandbox firewall policy, not Bayern
+  rejecting our requests — the same probe will succeed from any
+  unrestricted host.
+- Push access to `SchockTop/OpenMap_Unifier` (this session's GitHub MCP
   scope is `schocktop/openmap_workflow` only).
 
 **Recommended path** (needs you):
-1. In `Kleinschock/OpenMap_Unifier`, rebase
+1. In `SchockTop/OpenMap_Unifier`, rebase
    `claude/fix-dgm5-lod2-downloads-wcK4n` onto `main`, resolving the
    `backend/downloader.py` conflict in favour of the fix branch's
    per-dataset `url_path` + mirror fallback (the more general solution).
