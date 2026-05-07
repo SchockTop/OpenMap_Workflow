@@ -69,6 +69,7 @@ def phase1_download(poly_wkt: str, datasets: list[str], out_root: Path) -> dict[
 # Map of dataset key -> file extensions accepted when collecting local tiles.
 _LOCAL_EXT_BY_DATASET: dict[str, tuple[str, ...]] = {
     "dgm1":  (".tif", ".tiff"),
+    "dgm5":  (".zip", ".tif", ".tiff"),
     "dop20": (".tif", ".tiff"),
     "dop40": (".tif", ".tiff"),
     "lod2":  (".gml", ".xml", ".zip"),
@@ -114,13 +115,26 @@ def phase2_preprocess(downloads: dict[str, list[Path]],
                       bbox_utm32n: tuple[float, float, float, float],
                       out_root: Path) -> tuple[Optional[Path], Optional[Path]]:
     # Lazy: needs the openmap_blender_tools submodule (vendored GDAL).
-    from blender_tools.geo_import import dgm_tif_to_heightmap, dop_to_udim_tiles
+    from blender_tools.geo_import import (
+        dgm_tif_to_heightmap, dgm5_xyz_to_geotiffs, dop_to_udim_tiles,
+    )
     out_root.mkdir(parents=True, exist_ok=True)
+
+    # DGM5 .zip → .tif conversion (if DGM5 was downloaded/supplied).
+    dgm5_zips = [p for p in downloads.get("dgm5", []) if p.suffix.lower() == ".zip"]
+    dgm5_tifs = [p for p in downloads.get("dgm5", []) if p.suffix.lower() in (".tif", ".tiff")]
+    if dgm5_zips:
+        converted = dgm5_xyz_to_geotiffs(dgm5_zips, out_root / "dgm5_converted")
+        dgm5_tifs.extend(converted)
+
+    # Prefer DGM1 (1 m); fall back to DGM5 (5 m) for large areas.
+    elevation_tifs = downloads.get("dgm1") or dgm5_tifs
     heightmap = None
-    if downloads.get("dgm1"):
+    if elevation_tifs:
+        source = "dgm1" if downloads.get("dgm1") else "dgm5"
         heightmap = out_root / "heightmap.tif"
-        dgm_tif_to_heightmap(downloads["dgm1"], heightmap, bbox_utm32n=bbox_utm32n)
-        print(f"[2] heightmap: {heightmap} ({heightmap.stat().st_size//1024} KB)")
+        dgm_tif_to_heightmap(elevation_tifs, heightmap, bbox_utm32n=bbox_utm32n)
+        print(f"[2] heightmap ({source}): {heightmap} ({heightmap.stat().st_size//1024} KB)")
 
     ortho_dir = None
     ortho_input = downloads.get("dop40") or downloads.get("dop20")
@@ -406,6 +420,7 @@ def main(argv: list[str] | None = None) -> int:
         # without explicit local paths (lets you re-run after a prior download).
         local_inputs: dict[str, list[Path]] = {
             "dgm1":  list(args.local_dgm)  or ([raw / "dgm1"]  if (raw / "dgm1").is_dir() else []),
+            "dgm5":  [raw / "dgm5"] if (raw / "dgm5").is_dir() and not args.local_dgm else [],
             "dop40": list(args.local_dop)  or ([raw / "dop40"] if (raw / "dop40").is_dir() else []),
             "dop20": ([raw / "dop20"] if (raw / "dop20").is_dir() and not args.local_dop else []),
             "lod2":  list(args.local_lod2) or ([raw / "lod2"]  if (raw / "lod2").is_dir() else []),
@@ -427,7 +442,15 @@ def main(argv: list[str] | None = None) -> int:
         source = f"region {args.region!r}"
     elif skip_download and downloads.get("dgm1"):
         bbox = auto_bbox_from_tiles(downloads["dgm1"])
-        source = f"auto from {len(downloads['dgm1'])} DGM tile(s)"
+        source = f"auto from {len(downloads['dgm1'])} DGM1 tile(s)"
+    elif skip_download and downloads.get("dgm5"):
+        dgm5_tifs = [p for p in downloads["dgm5"] if p.suffix.lower() in (".tif", ".tiff")]
+        if dgm5_tifs:
+            bbox = auto_bbox_from_tiles(dgm5_tifs)
+            source = f"auto from {len(dgm5_tifs)} DGM5 tile(s)"
+        else:
+            ap.error("DGM5 .zip tiles found but not yet converted to GeoTIFF; "
+                     "supply --bbox-utm32n or --region explicitly")
     else:
         ap.error("must supply one of: --region, --bbox-utm32n, or "
                  "--local-dgm with georeferenced GeoTIFFs")
@@ -435,8 +458,8 @@ def main(argv: list[str] | None = None) -> int:
 
     heightmap, ortho_dir = phase2_preprocess(downloads, bbox, proc)
     if heightmap is None:
-        print("[!] no DGM1 tiles available — cannot build terrain "
-              "(supply --local-dgm or run without --skip-download)",
+        print("[!] no DGM1/DGM5 tiles available — cannot build terrain "
+              "(supply --local-dgm or add dgm1/dgm5 to --datasets)",
               file=sys.stderr)
         return 1
     cityjson = phase3_lod2(downloads, proc)
