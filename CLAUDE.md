@@ -12,16 +12,17 @@ Geospatial-to-Blender pipeline: downloads Bayern OpenData (DGM1/5, DOP20/40, LoD
 
 ## Build & Test
 
-```bash
-# Unit tests (no Blender/GDAL needed)
-pytest openmap_blender_tools/tests/ -v --ignore=openmap_blender_tools/tests/smoke_*.py
-pytest workflows/tests/ -v --ignore=workflows/tests/visual/
+```powershell
+# Unit tests require Python 3.11+ (Anaconda). System Python 3.10 can't install the package.
+# First-time setup: cd openmap_blender_tools && pip install -e .
+& "C:\ProgramData\anaconda3\python.exe" -m pytest openmap_blender_tools/tests/ -v --ignore=openmap_blender_tools/tests/smoke_*.py
+& "C:\ProgramData\anaconda3\python.exe" -m pytest workflows/tests/ -v --ignore=workflows/tests/visual/
 
 # Smoke tests (need Blender on PATH)
 blender --background --python openmap_blender_tools/tests/smoke_terrain.py
 
 # Visual regression tests (need full pipeline output)
-pytest workflows/tests/visual/ -v
+& "C:\ProgramData\anaconda3\python.exe" -m pytest workflows/tests/visual/ -v
 ```
 
 ## Submodule Workflow
