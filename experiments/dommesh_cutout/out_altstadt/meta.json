@@ -1,0 +1,19 @@
+{
+ "slpk": "https://download1.bayernwolke.de/p/dom-mesh-slpk/125023_0/DSM_Mesh.slpk",
+ "aoi_epsg25832": [
+  689977.0,
+  5506729.0,
+  690297.0,
+  5507049.0
+ ],
+ "anchor_epsg25832": [
+  690137.0,
+  5506889.0
+ ],
+ "half_m": 160.0,
+ "leaf_nodes": 14,
+ "vertices": 212280,
+ "triangles": 70760,
+ "bytes_fetched": 5741199,
+ "seconds": 29.1
+}

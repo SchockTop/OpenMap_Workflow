@@ -1,0 +1,2535 @@
+{
+ "nodes": [
+  {
+   "children": [
+    108326
+   ],
+   "index": 0,
+   "lodThreshold": 0.0,
+   "obb": {
+    "center": [
+     700987.625,
+     5505999.552734375,
+     507.58056640625
+    ],
+    "halfSize": [
+     17068.5859375,
+     12059.267578125,
+     203.69424438476562
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "index": 1,
+   "lodThreshold": 2879076.75950852,
+   "mesh": {
+    "attribute": {
+     "resource": 1
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 1,
+     "vertexCount": 1782
+    },
+    "material": {
+     "definition": 0,
+     "resource": 1,
+     "texelCountHint": 65536
+    }
+   },
+   "obb": {
+    "center": [
+     684041.8018798828,
+     5512021.334472656,
+     449.69244384765625
+    ],
+    "halfSize": [
+     101.7034912109375,
+     2021.83447265625,
+     42.33355712890625
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 17847
+  },
+  {
+   "index": 2,
+   "lodThreshold": 2958903.740951215,
+   "mesh": {
+    "attribute": {
+     "resource": 2
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 2,
+     "vertexCount": 1257
+    },
+    "material": {
+     "definition": 0,
+     "resource": 2,
+     "texelCountHint": 65536
+    }
+   },
+   "obb": {
+    "center": [
+     684032.5263671875,
+     5515956.952880859,
+     472.94818115234375
+    ],
+    "halfSize": [
+     92.427978515625,
+     2049.672119140625,
+     57.85723876953125
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 16870
+  },
+  {
+   "index": 3,
+   "lodThreshold": 2884377.101747773,
+   "mesh": {
+    "attribute": {
+     "resource": 3
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 3,
+     "vertexCount": 2364
+    },
+    "material": {
+     "definition": 0,
+     "resource": 3,
+     "texelCountHint": 65536
+    }
+   },
+   "obb": {
+    "center": [
+     684026.8187255859,
+     5508006.696899414,
+     434.9478759765625
+    ],
+    "halfSize": [
+     86.7203369140625,
+     2023.6947021484375,
+     41.8753662109375
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 37222
+  },
+  {
+   "index": 4,
+   "lodThreshold": 2851819.7693509953,
+   "mesh": {
+    "attribute": {
+     "resource": 4
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 4,
+     "vertexCount": 2685
+    },
+    "material": {
+     "definition": 0,
+     "resource": 4,
+     "texelCountHint": 65536
+    }
+   },
+   "obb": {
+    "center": [
+     684024.4727783203,
+     5503992.317993164,
+     446.51629638671875
+    ],
+    "halfSize": [
+     47.2615966796875,
+     2012.2410888671875,
+     50.47479248046875
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 29092
+  },
+  {
+   "index": 5,
+   "lodThreshold": 891257.4889697782,
+   "mesh": {
+    "attribute": {
+     "resource": 5
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 5,
+     "vertexCount": 42300
+    },
+    "material": {
+     "definition": 0,
+     "resource": 5,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684059.6189804077,
+     5515315.018867493,
+     490.9713592529297
+    ],
+    "halfSize": [
+     66.20035035375535,
+     13.366751421463302,
+     70.30732379396797
+    ],
+    "quaternion": [
+     -0.44050733977101253,
+     0.42329687899895024,
+     -0.5665334354284813,
+     0.553003527604799
+    ]
+   },
+   "parentIndex": 11
+  },
+  {
+   "index": 6,
+   "lodThreshold": 906216.514682807,
+   "mesh": {
+    "attribute": {
+     "resource": 6
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 6,
+     "vertexCount": 22659
+    },
+    "material": {
+     "definition": 0,
+     "resource": 6,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684061.3425216675,
+     5515438.972045898,
+     477.95050048828125
+    ],
+    "halfSize": [
+     70.89489637546156,
+     17.516686798455773,
+     69.9519678297623
+    ],
+    "quaternion": [
+     -0.02275182656271083,
+     0.7902396061079346,
+     0.6116692165936831,
+     0.029402192817235103
+    ]
+   },
+   "parentIndex": 11
+  },
+  {
+   "index": 7,
+   "lodThreshold": 893790.5043936742,
+   "mesh": {
+    "attribute": {
+     "resource": 7
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 7,
+     "vertexCount": 32295
+    },
+    "material": {
+     "definition": 0,
+     "resource": 7,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684191.2934646606,
+     5515310.307178497,
+     506.3428497314453
+    ],
+    "halfSize": [
+     68.80498504638672,
+     70.40716552734375,
+     12.837448120117188
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 11
+  },
+  {
+   "index": 8,
+   "lodThreshold": 921448.9148329409,
+   "mesh": {
+    "attribute": {
+     "resource": 8
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 8,
+     "vertexCount": 42105
+    },
+    "material": {
+     "definition": 0,
+     "resource": 8,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684184.458782196,
+     5515442.397895813,
+     499.42173767089844
+    ],
+    "halfSize": [
+     71.48824414095691,
+     14.307517661102295,
+     67.86152586891885
+    ],
+    "quaternion": [
+     -0.5118141951790242,
+     0.4322655878673103,
+     -0.5414808631710336,
+     0.5079283136416601
+    ]
+   },
+   "parentIndex": 11
+  },
+  {
+   "index": 9,
+   "lodThreshold": 902678.7189589358,
+   "mesh": {
+    "attribute": {
+     "resource": 9
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 9,
+     "vertexCount": 16728
+    },
+    "material": {
+     "definition": 0,
+     "resource": 9,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686061.8459701538,
+     5515309.968399048,
+     532.9288635253906
+    ],
+    "halfSize": [
+     70.75638037372123,
+     11.108809814160706,
+     70.26929431942948
+    ],
+    "quaternion": [
+     0.022888001833081515,
+     0.6549638341118206,
+     0.7550524746595562,
+     -0.019856370692966432
+    ]
+   },
+   "parentIndex": 16
+  },
+  {
+   "index": 10,
+   "lodThreshold": 1117736.3340396048,
+   "mesh": {
+    "attribute": {
+     "resource": 10
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 10,
+     "vertexCount": 10302
+    },
+    "material": {
+     "definition": 0,
+     "resource": 10,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686061.2771263123,
+     5515445.002166748,
+     539.7749481201172
+    ],
+    "halfSize": [
+     78.73514915367844,
+     8.035729051072623,
+     68.75839362573457
+    ],
+    "quaternion": [
+     0.45555680909899865,
+     -0.46760292303743334,
+     -0.5546875729950437,
+     0.5158848668813376
+    ]
+   },
+   "parentIndex": 16
+  },
+  {
+   "children": [
+    5,
+    6,
+    7,
+    8
+   ],
+   "index": 11,
+   "lodThreshold": 900629.0889057583,
+   "mesh": {
+    "attribute": {
+     "resource": 11
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 11,
+     "vertexCount": 45741
+    },
+    "material": {
+     "definition": 0,
+     "resource": 11,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684122.8525009155,
+     5515374.972366333,
+     491.7933349609375
+    ],
+    "halfSize": [
+     29.67897591926348,
+     141.35201571048447,
+     139.46341548536492
+    ],
+    "quaternion": [
+     0.7423190393050546,
+     -0.02709613675971445,
+     -0.6674368135833567,
+     0.05250089545664607
+    ]
+   },
+   "parentIndex": 267
+  },
+  {
+   "index": 12,
+   "lodThreshold": 892216.7703361359,
+   "mesh": {
+    "attribute": {
+     "resource": 12
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 12,
+     "vertexCount": 37173
+    },
+    "material": {
+     "definition": 0,
+     "resource": 12,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686186.6477470398,
+     5515309.812889099,
+     527.5461730957031
+    ],
+    "halfSize": [
+     67.17150657819084,
+     9.154693216857408,
+     70.34514755201944
+    ],
+    "quaternion": [
+     -0.6751988551193993,
+     0.014850133329285968,
+     0.012696260668341508,
+     0.7373769623154043
+    ]
+   },
+   "parentIndex": 16
+  },
+  {
+   "index": 13,
+   "lodThreshold": 959211.1317224517,
+   "mesh": {
+    "attribute": {
+     "resource": 13
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 13,
+     "vertexCount": 48135
+    },
+    "material": {
+     "definition": 0,
+     "resource": 13,
+     "texelCountHint": 2097152
+    }
+   },
+   "obb": {
+    "center": [
+     686184.7989845276,
+     5515438.510940552,
+     534.8669128417969
+    ],
+    "halfSize": [
+     68.82377686165619,
+     7.546989669233094,
+     72.93838326957066
+    ],
+    "quaternion": [
+     0.7319961744108179,
+     -0.00476851490566044,
+     -0.02978924038540336,
+     0.6806404800308514
+    ]
+   },
+   "parentIndex": 16
+  },
+  {
+   "index": 14,
+   "lodThreshold": 761810.719290524,
+   "mesh": {
+    "attribute": {
+     "resource": 14
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 14,
+     "vertexCount": 57174
+    },
+    "material": {
+     "definition": 0,
+     "resource": 14,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686062.698135376,
+     5507313.373996735,
+     444.34618377685547
+    ],
+    "halfSize": [
+     65.00137329101562,
+     64.34130859375,
+     10.730201721191406
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 31
+  },
+  {
+   "index": 15,
+   "lodThreshold": 756615.7809711369,
+   "mesh": {
+    "attribute": {
+     "resource": 15
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 15,
+     "vertexCount": 44901
+    },
+    "material": {
+     "definition": 0,
+     "resource": 15,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686062.5030975342,
+     5507437.60679245,
+     441.2908401489258
+    ],
+    "halfSize": [
+     64.77936553955078,
+     63.793521881103516,
+     13.832237243652344
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 31
+  },
+  {
+   "children": [
+    9,
+    10,
+    12,
+    13
+   ],
+   "index": 16,
+   "lodThreshold": 939671.8813135207,
+   "mesh": {
+    "attribute": {
+     "resource": 16
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 16,
+     "vertexCount": 36774
+    },
+    "material": {
+     "definition": 0,
+     "resource": 16,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686122.6055374146,
+     5515380.666625977,
+     533.2331085205078
+    ],
+    "halfSize": [
+     144.38334833604233,
+     19.83166501234432,
+     134.469205951101
+    ],
+    "quaternion": [
+     -0.4767533665239514,
+     -0.5020195245163581,
+     0.484951125057525,
+     0.5343267092825051
+    ]
+   },
+   "parentIndex": 235
+  },
+  {
+   "index": 17,
+   "lodThreshold": 930642.2563956333,
+   "mesh": {
+    "attribute": {
+     "resource": 17
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 17,
+     "vertexCount": 8928
+    },
+    "material": {
+     "definition": 0,
+     "resource": 17,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686061.0118713379,
+     5511311.793296814,
+     454.12127685546875
+    ],
+    "halfSize": [
+     71.80556357660424,
+     11.82309038610421,
+     71.84398273576716
+    ],
+    "quaternion": [
+     -0.5027018681430667,
+     0.4969213292348168,
+     -0.4788400651566172,
+     0.5206459609348941
+    ]
+   },
+   "parentIndex": 58
+  },
+  {
+   "index": 18,
+   "lodThreshold": 738649.6196081234,
+   "mesh": {
+    "attribute": {
+     "resource": 18
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 18,
+     "vertexCount": 32463
+    },
+    "material": {
+     "definition": 0,
+     "resource": 18,
+     "texelCountHint": 524288
+    }
+   },
+   "obb": {
+    "center": [
+     702031.7424888611,
+     5495313.127742767,
+     485.43978118896484
+    ],
+    "halfSize": [
+     64.00563526284971,
+     13.110312753543283,
+     36.87625690662175
+    ],
+    "quaternion": [
+     0.3783913509449828,
+     0.40769851618123476,
+     0.5727509012566566,
+     0.6021281557235808
+    ]
+   },
+   "parentIndex": 59
+  },
+  {
+   "index": 19,
+   "lodThreshold": 766775.9996227329,
+   "mesh": {
+    "attribute": {
+     "resource": 19
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 19,
+     "vertexCount": 71400
+    },
+    "material": {
+     "definition": 0,
+     "resource": 19,
+     "texelCountHint": 2097152
+    }
+   },
+   "obb": {
+    "center": [
+     684062.2149009705,
+     5509812.767318726,
+     440.21349334716797
+    ],
+    "halfSize": [
+     64.85478144488704,
+     12.314212415784969,
+     65.21285722163965
+    ],
+    "quaternion": [
+     0.6494374201345849,
+     0.01818999727859378,
+     -0.01541905845214619,
+     0.7600410606205803
+    ]
+   },
+   "parentIndex": 61
+  },
+  {
+   "index": 20,
+   "lodThreshold": 841720.39861693,
+   "mesh": {
+    "attribute": {
+     "resource": 20
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 20,
+     "vertexCount": 54798
+    },
+    "material": {
+     "definition": 0,
+     "resource": 20,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684059.185585022,
+     5511313.578941345,
+     422.34168243408203
+    ],
+    "halfSize": [
+     67.49317372342792,
+     13.223000322252073,
+     68.3255199432375
+    ],
+    "quaternion": [
+     0.6027044942525286,
+     0.014057830995906812,
+     -0.010611540425559686,
+     0.7977700578581667
+    ]
+   },
+   "parentIndex": 70
+  },
+  {
+   "index": 21,
+   "lodThreshold": 858125.7544411724,
+   "mesh": {
+    "attribute": {
+     "resource": 21
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 21,
+     "vertexCount": 11208
+    },
+    "material": {
+     "definition": 0,
+     "resource": 21,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     694059.2236061096,
+     5495315.3118133545,
+     543.7802734375
+    ],
+    "halfSize": [
+     68.98814557148143,
+     6.848296971378405,
+     68.30706757462362
+    ],
+    "quaternion": [
+     -0.5026446116676541,
+     0.5250081104250982,
+     0.4736717378843808,
+     -0.49734290291023947
+    ]
+   },
+   "parentIndex": 51
+  },
+  {
+   "index": 22,
+   "lodThreshold": 747217.2615721317,
+   "mesh": {
+    "attribute": {
+     "resource": 22
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 22,
+     "vertexCount": 56028
+    },
+    "material": {
+     "definition": 0,
+     "resource": 22,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686062.7095909119,
+     5507438.1093940735,
+     451.3666763305664
+    ],
+    "halfSize": [
+     64.37577056884766,
+     64.1883544921875,
+     10.075874328613281
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 31
+  },
+  {
+   "index": 23,
+   "lodThreshold": 798980.5899898212,
+   "mesh": {
+    "attribute": {
+     "resource": 23
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 23,
+     "vertexCount": 55890
+    },
+    "material": {
+     "definition": 0,
+     "resource": 23,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     702096.8612365723,
+     5495313.589473724,
+     490.2977294921875
+    ],
+    "halfSize": [
+     66.56824399084508,
+     21.703215553502382,
+     34.83729699004773
+    ],
+    "quaternion": [
+     -0.3706421366030145,
+     0.4567153920241289,
+     -0.5622642418788452,
+     0.5812868362234206
+    ]
+   },
+   "parentIndex": 59
+  },
+  {
+   "index": 24,
+   "lodThreshold": 921889.3304255246,
+   "mesh": {
+    "attribute": {
+     "resource": 24
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 24,
+     "vertexCount": 26859
+    },
+    "material": {
+     "definition": 0,
+     "resource": 24,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     690064.3079299927,
+     5495309.665855408,
+     495.68377685546875
+    ],
+    "halfSize": [
+     68.86693744865968,
+     9.226539209290607,
+     71.50532363466603
+    ],
+    "quaternion": [
+     -0.63295152223093,
+     0.015944438625086398,
+     0.02672366497922995,
+     0.7735657639045694
+    ]
+   },
+   "parentIndex": 68
+  },
+  {
+   "index": 25,
+   "lodThreshold": 894952.7195061296,
+   "mesh": {
+    "attribute": {
+     "resource": 25
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 25,
+     "vertexCount": 11880
+    },
+    "material": {
+     "definition": 0,
+     "resource": 25,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686189.3104629517,
+     5511310.376941681,
+     459.72686767578125
+    ],
+    "halfSize": [
+     70.41787017387172,
+     12.88853063812239,
+     70.45292610833371
+    ],
+    "quaternion": [
+     -0.49327919895404104,
+     0.48972090257866757,
+     -0.5100855148284644,
+     0.5066180339801984
+    ]
+   },
+   "parentIndex": 58
+  },
+  {
+   "index": 26,
+   "lodThreshold": 964482.8808703914,
+   "mesh": {
+    "attribute": {
+     "resource": 26
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 26,
+     "vertexCount": 12663
+    },
+    "material": {
+     "definition": 0,
+     "resource": 26,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     694061.4163246155,
+     5495439.799606323,
+     536.4090270996094
+    ],
+    "halfSize": [
+     70.04886678353239,
+     8.30599215680528,
+     73.13853569682554
+    ],
+    "quaternion": [
+     0.46034979015980065,
+     0.5127237617999736,
+     0.5107889199391482,
+     0.5140886047106097
+    ]
+   },
+   "parentIndex": 51
+  },
+  {
+   "index": 27,
+   "lodThreshold": 793259.7882784782,
+   "mesh": {
+    "attribute": {
+     "resource": 27
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 27,
+     "vertexCount": 54942
+    },
+    "material": {
+     "definition": 0,
+     "resource": 27,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684062.7599334717,
+     5515064.2914123535,
+     474.7685241699219
+    ],
+    "halfSize": [
+     65.64452971846629,
+     13.191407044383322,
+     66.32949969962043
+    ],
+    "quaternion": [
+     0.5761226676255877,
+     -0.5051782947427941,
+     -0.4874918733763206,
+     0.41860391715851086
+    ]
+   },
+   "parentIndex": 71
+  },
+  {
+   "index": 28,
+   "lodThreshold": 851874.3459513861,
+   "mesh": {
+    "attribute": {
+     "resource": 28
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 28,
+     "vertexCount": 65892
+    },
+    "material": {
+     "definition": 0,
+     "resource": 28,
+     "texelCountHint": 2097152
+    }
+   },
+   "obb": {
+    "center": [
+     684060.2331542969,
+     5511435.539299011,
+     421.48228454589844
+    ],
+    "halfSize": [
+     68.65599855185903,
+     19.57124291567447,
+     68.73639468077076
+    ],
+    "quaternion": [
+     -0.5190512109912259,
+     0.3841345869218277,
+     0.5936468093977393,
+     -0.48021862366753315
+    ]
+   },
+   "parentIndex": 70
+  },
+  {
+   "index": 29,
+   "lodThreshold": 893614.4359851304,
+   "mesh": {
+    "attribute": {
+     "resource": 29
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 29,
+     "vertexCount": 16158
+    },
+    "material": {
+     "definition": 0,
+     "resource": 29,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     706061.7015457153,
+     5495313.213844299,
+     516.2029724121094
+    ],
+    "halfSize": [
+     70.40023496716366,
+     8.695618511854581,
+     67.19121801834054
+    ],
+    "quaternion": [
+     0.7299809345873151,
+     0.00012372835899455306,
+     -0.0001306661363834383,
+     0.6834674847837953
+    ]
+   },
+   "parentIndex": 56
+  },
+  {
+   "index": 30,
+   "lodThreshold": 743166.4028967454,
+   "mesh": {
+    "attribute": {
+     "resource": 30
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 30,
+     "vertexCount": 42006
+    },
+    "material": {
+     "definition": 0,
+     "resource": 30,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     698030.9195728302,
+     5495313.301563263,
+     492.90443420410156
+    ],
+    "halfSize": [
+     33.29620361328125,
+     64.20103454589844,
+     21.724090576171875
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 72
+  },
+  {
+   "children": [
+    14,
+    15,
+    22
+   ],
+   "index": 31,
+   "lodThreshold": 722824.0475758348,
+   "mesh": {
+    "attribute": {
+     "resource": 31
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 31,
+     "vertexCount": 59769
+    },
+    "material": {
+     "definition": 0,
+     "resource": 31,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686065.1115646362,
+     5507375.665214539,
+     444.45057678222656
+    ],
+    "halfSize": [
+     67.41480255126953,
+     126.63253021240234,
+     16.991973876953125
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 505
+  },
+  {
+   "index": 32,
+   "lodThreshold": 817336.8112561818,
+   "mesh": {
+    "attribute": {
+     "resource": 32
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 32,
+     "vertexCount": 44484
+    },
+    "material": {
+     "definition": 0,
+     "resource": 32,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     694186.4073486328,
+     5495313.788173676,
+     549.6971740722656
+    ],
+    "halfSize": [
+     67.32858701040094,
+     8.212905788505417,
+     67.20973629446331
+    ],
+    "quaternion": [
+     0.5086197711661794,
+     -0.4844779290569208,
+     0.5150625898568855,
+     -0.49122051284912993
+    ]
+   },
+   "parentIndex": 51
+  },
+  {
+   "index": 33,
+   "lodThreshold": 893755.0568840791,
+   "mesh": {
+    "attribute": {
+     "resource": 33
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 33,
+     "vertexCount": 10812
+    },
+    "material": {
+     "definition": 0,
+     "resource": 33,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     690189.696434021,
+     5495310.303668976,
+     497.10833740234375
+    ],
+    "halfSize": [
+     70.4012222290039,
+     70.40576934814453,
+     16.174713134765625
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 68
+  },
+  {
+   "index": 34,
+   "lodThreshold": 893617.3412636754,
+   "mesh": {
+    "attribute": {
+     "resource": 34
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 34,
+     "vertexCount": 15807
+    },
+    "material": {
+     "definition": 0,
+     "resource": 34,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686186.498085022,
+     5511438.299671173,
+     460.9280700683594
+    ],
+    "halfSize": [
+     67.19934844970703,
+     70.40034484863281,
+     15.564231872558594
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 58
+  },
+  {
+   "index": 35,
+   "lodThreshold": 806814.9420718607,
+   "mesh": {
+    "attribute": {
+     "resource": 35
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 35,
+     "vertexCount": 46578
+    },
+    "material": {
+     "definition": 0,
+     "resource": 35,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     702032.8434448242,
+     5495437.618331909,
+     489.2570991516113
+    ],
+    "halfSize": [
+     66.89381855246603,
+     18.388752570131192,
+     34.98584713805637
+    ],
+    "quaternion": [
+     0.5158947142582094,
+     0.5687088995495608,
+     -0.4192160844669372,
+     -0.4844385504975447
+    ]
+   },
+   "parentIndex": 59
+  },
+  {
+   "index": 36,
+   "lodThreshold": 893621.7960332838,
+   "mesh": {
+    "attribute": {
+     "resource": 36
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 36,
+     "vertexCount": 5121
+    },
+    "material": {
+     "definition": 0,
+     "resource": 36,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     706061.6996421814,
+     5495438.299491882,
+     519.7860870361328
+    ],
+    "halfSize": [
+     70.39964294433594,
+     70.40052032470703,
+     7.7923126220703125
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 56
+  },
+  {
+   "index": 37,
+   "lodThreshold": 827410.7001043058,
+   "mesh": {
+    "attribute": {
+     "resource": 37
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 37,
+     "vertexCount": 57591
+    },
+    "material": {
+     "definition": 0,
+     "resource": 37,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684063.1136398315,
+     5515187.500823975,
+     484.81883239746094
+    ],
+    "halfSize": [
+     67.74224248057051,
+     13.026665176767276,
+     65.22112633503978
+    ],
+    "quaternion": [
+     -0.6605497099856368,
+     -0.09490278311550916,
+     -0.08433285372136824,
+     0.73996993937331
+    ]
+   },
+   "parentIndex": 71
+  },
+  {
+   "index": 38,
+   "lodThreshold": 682342.4851877105,
+   "mesh": {
+    "attribute": {
+     "resource": 38
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 38,
+     "vertexCount": 10722
+    },
+    "material": {
+     "definition": 0,
+     "resource": 38,
+     "texelCountHint": 262144
+    }
+   },
+   "obb": {
+    "center": [
+     684059.5855484009,
+     5509971.67477417,
+     450.7522659301758
+    ],
+    "halfSize": [
+     61.51771545410156,
+     29.978286743164062,
+     5.183265686035156
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 61
+  },
+  {
+   "index": 39,
+   "lodThreshold": 764143.2161047612,
+   "mesh": {
+    "attribute": {
+     "resource": 39
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 39,
+     "vertexCount": 43518
+    },
+    "material": {
+     "definition": 0,
+     "resource": 39,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684030.601732254,
+     5509937.493648529,
+     436.58885192871094
+    ],
+    "halfSize": [
+     33.76815865120411,
+     16.957508767857274,
+     65.10080945712322
+    ],
+    "quaternion": [
+     -0.6678318045242991,
+     0.024740469351351563,
+     0.015823050145652447,
+     0.7437326273663935
+    ]
+   },
+   "parentIndex": 61
+  },
+  {
+   "index": 40,
+   "lodThreshold": 916824.9204594656,
+   "mesh": {
+    "attribute": {
+     "resource": 40
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 40,
+     "vertexCount": 36849
+    },
+    "material": {
+     "definition": 0,
+     "resource": 40,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     690190.2166900635,
+     5495438.615997314,
+     501.9082946777344
+    ],
+    "halfSize": [
+     70.6610418767173,
+     23.765251841796328,
+     71.30864734191407
+    ],
+    "quaternion": [
+     -0.5493905336035965,
+     0.39022494481544456,
+     0.6046202707813462,
+     -0.42465145793890147
+    ]
+   },
+   "parentIndex": 68
+  },
+  {
+   "index": 41,
+   "lodThreshold": 893596.6170467,
+   "mesh": {
+    "attribute": {
+     "resource": 41
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 41,
+     "vertexCount": 3831
+    },
+    "material": {
+     "definition": 0,
+     "resource": 41,
+     "texelCountHint": 262144
+    }
+   },
+   "obb": {
+    "center": [
+     686061.7000045776,
+     5511410.151371002,
+     450.6471710205078
+    ],
+    "halfSize": [
+     70.39952850341797,
+     42.25132369995117,
+     5.5654754638671875
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 58
+  },
+  {
+   "index": 42,
+   "lodThreshold": 780912.870137464,
+   "mesh": {
+    "attribute": {
+     "resource": 42
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 42,
+     "vertexCount": 49275
+    },
+    "material": {
+     "definition": 0,
+     "resource": 42,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     698093.5620479584,
+     5495313.283214569,
+     490.546573638916
+    ],
+    "halfSize": [
+     65.81127502327777,
+     18.566675895907043,
+     33.4067173857449
+    ],
+    "quaternion": [
+     -0.4791980762185937,
+     0.5370827055605956,
+     -0.4620443961779525,
+     0.5180987839553776
+    ]
+   },
+   "parentIndex": 72
+  },
+  {
+   "index": 43,
+   "lodThreshold": 893590.4191967163,
+   "mesh": {
+    "attribute": {
+     "resource": 43
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 43,
+     "vertexCount": 19059
+    },
+    "material": {
+     "definition": 0,
+     "resource": 43,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     694189.6983718872,
+     5495440.769813538,
+     540.4178161621094
+    ],
+    "halfSize": [
+     70.39928436279297,
+     67.9301986694336,
+     8.921875
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 51
+  },
+  {
+   "index": 44,
+   "lodThreshold": 1063514.6394221026,
+   "mesh": {
+    "attribute": {
+     "resource": 44
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 44,
+     "vertexCount": 2067
+    },
+    "material": {
+     "definition": 0,
+     "resource": 44,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     706189.6915206909,
+     5495316.71206665,
+     513.1726379394531
+    ],
+    "halfSize": [
+     70.48917011681392,
+     2.3240585856043774,
+     76.8016865282242
+    ],
+    "quaternion": [
+     0.009611740788279881,
+     0.7117254341900693,
+     -0.7023243424369133,
+     0.009748783823220192
+    ]
+   },
+   "parentIndex": 56
+  },
+  {
+   "index": 45,
+   "lodThreshold": 744349.763729683,
+   "mesh": {
+    "attribute": {
+     "resource": 45
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 45,
+     "vertexCount": 51753
+    },
+    "material": {
+     "definition": 0,
+     "resource": 45,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686032.8727684021,
+     5511437.678104401,
+     463.79635429382324
+    ],
+    "halfSize": [
+     34.75110275647724,
+     14.682522942876167,
+     64.25213156117334
+    ],
+    "quaternion": [
+     -0.01209250221420473,
+     0.6896167385382314,
+     0.723961611208023,
+     0.012732271656935334
+    ]
+   },
+   "parentIndex": 58
+  },
+  {
+   "index": 46,
+   "lodThreshold": 854154.4263554704,
+   "mesh": {
+    "attribute": {
+     "resource": 46
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 46,
+     "vertexCount": 43386
+    },
+    "material": {
+     "definition": 0,
+     "resource": 46,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684190.3825073242,
+     5511314.40549469,
+     417.87644958496094
+    ],
+    "halfSize": [
+     68.77021830056016,
+     16.870969081313728,
+     68.82832958083779
+    ],
+    "quaternion": [
+     0.49785461614697063,
+     0.5612332695052147,
+     0.41581495540484775,
+     0.514058278199881
+    ]
+   },
+   "parentIndex": 70
+  },
+  {
+   "index": 47,
+   "lodThreshold": 770930.0115173731,
+   "mesh": {
+    "attribute": {
+     "resource": 47
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 47,
+     "vertexCount": 53367
+    },
+    "material": {
+     "definition": 0,
+     "resource": 47,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     702093.7818946838,
+     5495437.640796661,
+     509.97856521606445
+    ],
+    "halfSize": [
+     65.38926628608826,
+     18.37199826974293,
+     35.280136632646155
+    ],
+    "quaternion": [
+     -0.41310322763784635,
+     0.48942120412145323,
+     -0.5100629019215505,
+     0.5741501907553517
+    ]
+   },
+   "parentIndex": 59
+  },
+  {
+   "index": 48,
+   "lodThreshold": 893998.3610392662,
+   "mesh": {
+    "attribute": {
+     "resource": 48
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 48,
+     "vertexCount": 1539
+    },
+    "material": {
+     "definition": 0,
+     "resource": 48,
+     "texelCountHint": 2097152
+    }
+   },
+   "obb": {
+    "center": [
+     706189.7036437988,
+     5495438.299835205,
+     514.8354339599609
+    ],
+    "halfSize": [
+     70.40089278250628,
+     0.5758743213067168,
+     70.41534815955339
+    ],
+    "quaternion": [
+     -0.49496081273906856,
+     0.4946273081758984,
+     -0.5053162198366327,
+     0.5049882556321668
+    ]
+   },
+   "parentIndex": 56
+  },
+  {
+   "index": 49,
+   "lodThreshold": 893414.1768343208,
+   "mesh": {
+    "attribute": {
+     "resource": 49
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 49,
+     "vertexCount": 65955
+    },
+    "material": {
+     "definition": 0,
+     "resource": 49,
+     "texelCountHint": 2097152
+    }
+   },
+   "obb": {
+    "center": [
+     684189.9676513672,
+     5515063.49962616,
+     493.94647216796875
+    ],
+    "halfSize": [
+     65.83732144239981,
+     14.000038695044093,
+     70.39233931110832
+    ],
+    "quaternion": [
+     0.5423686171587392,
+     -0.508783906081822,
+     -0.478263684822593,
+     0.46716064656593514
+    ]
+   },
+   "parentIndex": 71
+  },
+  {
+   "index": 50,
+   "lodThreshold": 804772.3079973162,
+   "mesh": {
+    "attribute": {
+     "resource": 50
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 50,
+     "vertexCount": 44217
+    },
+    "material": {
+     "definition": 0,
+     "resource": 50,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     690032.5421028137,
+     5495436.480003357,
+     531.340461730957
+    ],
+    "halfSize": [
+     66.80907915105196,
+     18.363532167685555,
+     35.53780708401173
+    ],
+    "quaternion": [
+     -0.4425260775007324,
+     -0.5379785713739821,
+     0.46596071479634155,
+     0.545555077348274
+    ]
+   },
+   "parentIndex": 68
+  },
+  {
+   "children": [
+    21,
+    26,
+    32,
+    43
+   ],
+   "index": 51,
+   "lodThreshold": 856483.6307177859,
+   "mesh": {
+    "attribute": {
+     "resource": 51
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 51,
+     "vertexCount": 27381
+    },
+    "material": {
+     "definition": 0,
+     "resource": 51,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     694123.9686813354,
+     5495379.079910278,
+     541.1026611328125
+    ],
+    "halfSize": [
+     137.8442057215267,
+     134.26607267702832,
+     15.47178734349435
+    ],
+    "quaternion": [
+     -0.02024344700003502,
+     0.02736957110247306,
+     0.9994066064013698,
+     -0.005248286670971998
+    ]
+   },
+   "parentIndex": 269
+  },
+  {
+   "index": 52,
+   "lodThreshold": 756498.3379174068,
+   "mesh": {
+    "attribute": {
+     "resource": 52
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 52,
+     "vertexCount": 49179
+    },
+    "material": {
+     "definition": 0,
+     "resource": 52,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684093.8695106506,
+     5509938.138214111,
+     433.5292510986328
+    ],
+    "halfSize": [
+     64.77433415488314,
+     17.9883299927965,
+     33.90880314108988
+    ],
+    "quaternion": [
+     -0.4368428274566354,
+     -0.5140503105755696,
+     0.48391867082795953,
+     0.5574435803148853
+    ]
+   },
+   "parentIndex": 61
+  },
+  {
+   "index": 53,
+   "lodThreshold": 767430.6400592837,
+   "mesh": {
+    "attribute": {
+     "resource": 53
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 53,
+     "vertexCount": 53520
+    },
+    "material": {
+     "definition": 0,
+     "resource": 53,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     698032.69972229,
+     5495436.850894928,
+     511.3034477233887
+    ],
+    "halfSize": [
+     65.24069594411368,
+     34.41752733218088,
+     20.06402452873633
+    ],
+    "quaternion": [
+     0.7048413168761576,
+     0.6974130722374348,
+     0.10540475997157334,
+     -0.07552192614759064
+    ]
+   },
+   "parentIndex": 72
+  },
+  {
+   "index": 54,
+   "lodThreshold": 718419.3599084119,
+   "mesh": {
+    "attribute": {
+     "resource": 54
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 54,
+     "vertexCount": 11358
+    },
+    "material": {
+     "definition": 0,
+     "resource": 54,
+     "texelCountHint": 524288
+    }
+   },
+   "obb": {
+    "center": [
+     686092.8376255035,
+     5511439.182090759,
+     461.6111755371094
+    ],
+    "halfSize": [
+     32.88267517089844,
+     63.12305450439453,
+     15.127182006835938
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 58
+  },
+  {
+   "index": 55,
+   "lodThreshold": 731090.9251924243,
+   "mesh": {
+    "attribute": {
+     "resource": 55
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 55,
+     "vertexCount": 39369
+    },
+    "material": {
+     "definition": 0,
+     "resource": 55,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684154.5255203247,
+     5511437.830413818,
+     423.378662109375
+    ],
+    "halfSize": [
+     35.229515075683594,
+     63.67730712890625,
+     18.36792755126953
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 70
+  },
+  {
+   "children": [
+    29,
+    36,
+    44,
+    48
+   ],
+   "index": 56,
+   "lodThreshold": 815126.7938938823,
+   "mesh": {
+    "attribute": {
+     "resource": 56
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 56,
+     "vertexCount": 6837
+    },
+    "material": {
+     "definition": 0,
+     "resource": 56,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     706125.7717514038,
+     5495374.293701172,
+     516.2029724121094
+    ],
+    "halfSize": [
+     134.47500610351562,
+     134.40826416015625,
+     13.119583129882812
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 331
+  },
+  {
+   "index": 57,
+   "lodThreshold": 955941.228355133,
+   "mesh": {
+    "attribute": {
+     "resource": 57
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 57,
+     "vertexCount": 16992
+    },
+    "material": {
+     "definition": 0,
+     "resource": 57,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686062.2683410645,
+     5515061.965316772,
+     522.6181793212891
+    ],
+    "halfSize": [
+     71.63451495528605,
+     7.818923626034225,
+     72.81394846811259
+    ],
+    "quaternion": [
+     0.5325688587232444,
+     0.48296113106449984,
+     0.49294844762783524,
+     0.4900212086548155
+    ]
+   },
+   "parentIndex": 75
+  },
+  {
+   "children": [
+    17,
+    25,
+    34,
+    41,
+    45,
+    54
+   ],
+   "index": 58,
+   "lodThreshold": 847655.8644808392,
+   "mesh": {
+    "attribute": {
+     "resource": 58
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 58,
+     "vertexCount": 38373
+    },
+    "material": {
+     "definition": 0,
+     "resource": 58,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686123.1808013916,
+     5511372.693717957,
+     461.22991943359375
+    ],
+    "halfSize": [
+     21.561702728271484,
+     137.13197943016814,
+     136.0602784510112
+    ],
+    "quaternion": [
+     0.49395893510710387,
+     0.5059689343566804,
+     -0.49395894309746546,
+     0.5059689343566804
+    ]
+   },
+   "parentIndex": 498
+  },
+  {
+   "children": [
+    18,
+    23,
+    35,
+    47
+   ],
+   "index": 59,
+   "lodThreshold": 763849.5116263381,
+   "mesh": {
+    "attribute": {
+     "resource": 59
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 59,
+     "vertexCount": 78039
+    },
+    "material": {
+     "definition": 0,
+     "resource": 59,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     702064.1907653809,
+     5495374.632507324,
+     497.24700927734375
+    ],
+    "halfSize": [
+     32.78502899336618,
+     72.82668872384627,
+     130.17661236777639
+    ],
+    "quaternion": [
+     -0.5082049221682091,
+     0.426653381645345,
+     0.4771345702500798,
+     0.5762267396011915
+    ]
+   },
+   "parentIndex": 510
+  },
+  {
+   "index": 60,
+   "lodThreshold": 819001.2477716964,
+   "mesh": {
+    "attribute": {
+     "resource": 60
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 60,
+     "vertexCount": 42738
+    },
+    "material": {
+     "definition": 0,
+     "resource": 60,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     690093.5884532928,
+     5495437.988998413,
+     525.4800491333008
+    ],
+    "halfSize": [
+     33.83248837541731,
+     15.977653464432175,
+     67.39710906468214
+    ],
+    "quaternion": [
+     -0.6354015335384058,
+     0.022986946874791688,
+     0.01915184182934831,
+     0.7716020336743578
+    ]
+   },
+   "parentIndex": 68
+  },
+  {
+   "children": [
+    19,
+    38,
+    39,
+    52
+   ],
+   "index": 61,
+   "lodThreshold": 754821.9821554217,
+   "mesh": {
+    "attribute": {
+     "resource": 61
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 61,
+     "vertexCount": 70938
+    },
+    "material": {
+     "definition": 0,
+     "resource": 61,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     684064.30128479,
+     5509875.82472229,
+     434.32568359375
+    ],
+    "halfSize": [
+     69.38882446289062,
+     129.40505981445312,
+     31.289779663085938
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 796
+  },
+  {
+   "index": 62,
+   "lodThreshold": 900862.2420891416,
+   "mesh": {
+    "attribute": {
+     "resource": 62
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 62,
+     "vertexCount": 19365
+    },
+    "material": {
+     "definition": 0,
+     "resource": 62,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     686061.8946685791,
+     5515188.093132019,
+     529.0731964111328
+    ],
+    "halfSize": [
+     70.68515354799743,
+     7.080970423560822,
+     70.52694363286086
+    ],
+    "quaternion": [
+     -0.4768481532615433,
+     -0.5006834346598136,
+     0.4993184858486922,
+     0.5221235307502518
+    ]
+   },
+   "parentIndex": 75
+  },
+  {
+   "index": 63,
+   "lodThreshold": 755560.1902266272,
+   "mesh": {
+    "attribute": {
+     "resource": 63
+    },
+    "geometry": {
+     "definition": 0,
+     "featureCount": 0,
+     "resource": 63,
+     "vertexCount": 52797
+    },
+    "material": {
+     "definition": 0,
+     "resource": 63,
+     "texelCountHint": 1048576
+    }
+   },
+   "obb": {
+    "center": [
+     698093.0422019958,
+     5495437.609867096,
+     509.6142044067383
+    ],
+    "halfSize": [
+     33.3010368347168,
+     64.73416137695312,
+     21.820777893066406
+    ],
+    "quaternion": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "parentIndex": 72
+  }
+ ]
+}

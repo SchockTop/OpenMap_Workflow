@@ -1,0 +1,179 @@
+{
+ "capabilities": [
+  "View",
+  "Query"
+ ],
+ "drawingInfo": {
+  "renderer": {
+   "description": "",
+   "label": "",
+   "symbol": {
+    "symbolLayers": [
+     {
+      "material": {
+       "color": [
+        255,
+        255,
+        255
+       ],
+       "transparency": 0
+      },
+      "type": "Fill"
+     }
+    ],
+    "type": "MeshSymbol3D"
+   },
+   "type": "simple"
+  }
+ },
+ "geometryDefinitions": [
+  {
+   "geometryBuffers": [
+    {
+     "faceRange": {
+      "binding": "per-feature",
+      "component": 2,
+      "type": "UInt32"
+     },
+     "featureId": {
+      "binding": "per-feature",
+      "component": 1,
+      "type": "UInt64"
+     },
+     "offset": 8,
+     "position": {
+      "component": 3,
+      "type": "Float32"
+     },
+     "uv0": {
+      "component": 2,
+      "type": "Float32"
+     }
+    },
+    {
+     "compressedAttributes": {
+      "attributes": [
+       "position",
+       "uv0",
+       "feature-index"
+      ],
+      "encoding": "draco"
+     }
+    }
+   ]
+  }
+ ],
+ "heightModelInfo": {
+  "heightModel": "gravity_related_height",
+  "heightUnit": "meter"
+ },
+ "href": "./layers/0",
+ "id": 0,
+ "layerType": "IntegratedMesh",
+ "materialDefinitions": [
+  {
+   "doubleSided": true,
+   "pbrMetallicRoughness": {
+    "baseColorTexture": {
+     "texCoord": 0,
+     "textureSetDefinitionId": 0
+    },
+    "metallicFactor": 0
+   }
+  }
+ ],
+ "name": "Mesh",
+ "nodePages": {
+  "lodSelectionMetricType": "maxScreenThresholdSQ",
+  "nodesPerPage": 64,
+  "rootIndex": 0
+ },
+ "spatialReference": {
+  "latestVcsWkid": 7837,
+  "latestWkid": 25832,
+  "vcsWkid": 7837,
+  "wkid": 25832
+ },
+ "store": {
+  "defaultGeometrySchema": {
+   "featureAttributeOrder": [
+    "id",
+    "faceRange"
+   ],
+   "featureAttributes": {
+    "faceRange": {
+     "valueType": "UInt32",
+     "valuesPerElement": 2
+    },
+    "id": {
+     "valueType": "UInt64",
+     "valuesPerElement": 1
+    }
+   },
+   "geometryType": "triangles",
+   "header": [
+    {
+     "property": "vertexCount",
+     "type": "UInt32"
+    },
+    {
+     "property": "featureCount",
+     "type": "UInt32"
+    }
+   ],
+   "ordering": [
+    "position",
+    "uv0"
+   ],
+   "topology": "PerAttributeArray",
+   "vertexAttributes": {
+    "position": {
+     "valueType": "Float32",
+     "valuesPerElement": 3
+    },
+    "uv0": {
+     "valueType": "Float32",
+     "valuesPerElement": 2
+    }
+   }
+  },
+  "extent": [
+   683919.0390625,
+   5493940.28515625,
+   718056.2109375,
+   5518058.8203125
+  ],
+  "id": "3253929d-084c-46f6-9b91-508dfa1c1f77",
+  "indexCRS": "http://www.opengis.net/def/crs/EPSG/0/25832",
+  "lodModel": "node-switching",
+  "lodType": "MeshPyramid",
+  "normalReferenceFrame": "vertex-reference-frame",
+  "profile": "meshpyramids",
+  "resourcePattern": [
+   "Geometry",
+   "Texture"
+  ],
+  "rootNode": "./nodes/root",
+  "textureEncoding": [
+   "image/jpeg",
+   "image/vnd-ms.dds"
+  ],
+  "version": "1.9",
+  "vertexCRS": "http://www.opengis.net/def/crs/EPSG/0/25832"
+ },
+ "textureSetDefinitions": [
+  {
+   "formats": [
+    {
+     "format": "jpg",
+     "name": "0"
+    },
+    {
+     "format": "dds",
+     "name": "0_1"
+    }
+   ]
+  }
+ ],
+ "version": "19076b2d-b54c-46ab-b9ec-a9bab8da35da"
+}

@@ -1,0 +1,8 @@
+# regenerable / large — run probe2.py -> slpk_index.py -> cutout.py to rebuild
+cd.bin
+entries.json
+nodes_all.json
+__pycache__/
+out_*/cutout.obj
+out_*/cutout.mtl
+out_*/tex/
