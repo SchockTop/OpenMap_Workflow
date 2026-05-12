@@ -3,14 +3,17 @@
 Self-contained cinematic scene for the ~45 km² Allgäu polygon around Forggensee /
 Schwangau / Füssen (the Schwangau castles, pre-alpine lakes and forest).
 
-> **Status:** v5 look pass complete. `scene.blend` (259 MB, packed) is in this folder
+> **Status:** v6 cinematic-framing pass complete. `scene.blend` (~250 MB, packed) is in this folder
 > but **not tracked in git** (>100 MB). See `MANIFEST.md` for regeneration instructions.
 > This folder is meant to be liftable on its own; `MANIFEST.md` lists every commit/file
 > added across the repo for this scene + the Blender-tool changes it depends on.
 >
-> v5 fixes from v4: **exposure corrected** (no more white-wash), **3D trees hidden** (no noise
-> specks — forest reads via DOP ortho + forest overlay), **hand-placed camera keyframes** 
-> (1600–2400m, 48–52° off nadir), **clouds** at 2100m base. 4 frames at 85–100s each (RTX 4070).
+> v6 (`renders/allgaeu_v6_frame####.png`): cameras at 1900–2400 m looking ~5–8° below horizontal
+> south → foreground lake/meadows → forested AOI hill → a distant procedural mountain-ridge backdrop
+> on the horizon → broken cumulus + Nishita sky in the top ~25–30%. Keeps v5's tamed exposure
+> (−1.5 EV AgX), natural DOP ortho colours, forest-via-ortho overlay, and ortho-textured building roofs.
+> ~5 min/frame on an RTX 4070 (volume haze + clouds). The AOI's own terrain tops out at 1685 m
+> (no real alpine peaks inside the polygon) so the horizon ridge is a hazy procedural stand-in.
 
 ## Contents (when complete)
 
@@ -55,11 +58,24 @@ Then pack via File → External Data → Pack All Resources.
 - Renders: `renders/allgaeu_v5_frame{0060,0180}.png` are photo-real oblique aerials (Forggensee, mudflat sandbar, meadows, hedgerows, forest canopy, red-roof buildings — exposure & colour right). `renders/allgaeu_v6_frame####.png` are the cinematic-framing pass — foreground terrain → Säuling/Tegelberg massif → valley with the lake & villages → an Alps ridge on the horizon → hazy sky.
 - The `openmap_blender_tools` extension (rebuilt `dist/blender_tools-0.1.0.zip`): new `features/clouds.py` + `BLENDERTOOLS_OT_add_clouds`, forest-masked tree scatter + leaf translucency, OSM-forest→mask GeoTIFF rasterizer, the one-stop `BLENDERTOOLS_OT_build_cinematic_scene` operator + a reworked OpenMap N-panel (big "Build Cinematic Scene from Folder" button + per-step buttons), the `<UDIM>` ortho fix, the camera-elevation fix. Install on the Blender machine: `blender --command extension install-file dist/blender_tools-0.1.0.zip --repo user_default --enable`.
 
-**Still rough in the v6 renders (the remaining work):**
-1. **Grey "void wedges"** at the bottom corners of some v6 frames — the AOI terrain mesh is a finite 9×10 km plane, so when the camera looks past its flat edge it sees the mesh underside / black world. Fix: either (a) extend the far mountain-backdrop / a faded distance plane to cover behind the terrain edge, (b) add a downward "skirt" to the terrain plane edge, or (c) tighten the camera aim so the flat edges stay out of frame. Quick win: (a) or (c).
-2. **Mountain backdrop ridge is too spiky/uniform** — make it lower-frequency, more varied, atmospheric-faded (more aerial perspective / desaturation with distance), or replace it with a real wider DGM mosaic of the Alps to the south.
-3. **No clouds in the v6 frames** — the cumulus deck is in the scene but the v6 cameras don't catch it. Tune `features/clouds.py apply()` `base_altitude_m` / `coverage` so a broken deck sits between camera and peaks, and/or aim a frame upward through it.
-4. **Sky is flat hazy grey-blue** — pick a warmer time of day (golden hour) and dial the Nishita/sun/exposure so the sky has some gradient and warmth without re-blowing the ortho.
-These are all camera/lighting/backdrop tuning in `workflows/_assemble_allgaeu.py` (and the cloud kwargs) — no pipeline changes needed. The scene is built; this is finishing the shot.
+**Still rough in the v6 renders (the remaining polish):**
+1. **Cumulus reads as a dark band, not bright broken puffs** — density 0.16 makes the volume too opaque
+   and the low −1.5 EV exposure + AgX leaves it grey. Drop the cloud `density` (~0.05–0.07), maybe add a
+   touch of `Emission Strength` to the Principled Volume, and consider raising the deck so it spreads
+   across the sky rather than squashing into a horizon band. (Tune in `_do_clouds` in the assemble script
+   + the `clouds.py` noise-Scale workaround there.)
+2. **Backdrop ridge can read flat / a dark "gap band" sits between the AOI edge and the ridge** — the
+   8.7 km gap south of the AOI renders as the Nishita-sky horizon (a desaturated band). Push the ridge
+   closer, or add a wider faded distance plane to fill the gap, or use real alpine DGM south of the polygon.
+3. **High establishing frame (0180) is a bit milky** — the aerial-haze volume over a long sightline. Drop
+   `density` further or stratify it (denser near the ground only).
+4. **A faint gray/tan corner slab can still appear** — the AOI polygon is a rotated diamond so the
+   bbox-aligned terrain plane has corners with no DOP coverage. v6 backfilled the empty UDIM tiles with a
+   mottled dark green; any *truly uncovered* UV (outside the [0,10]×[0,11] tile grid) still shows the
+   image fallback. Cleanest fix: clip the terrain mesh to the AOI polygon.
+5. **Warmer time of day** — a golden-hour Nishita + sun + exposure could give the sky a gradient/warmth
+   without re-blowing the ortho.
+All of these are camera/lighting/backdrop tuning in `workflows/_assemble_allgaeu.py` (and the cloud
+kwargs) — no pipeline changes needed. The scene is built; this is finishing the shot.
 
 **Regenerate the packed scene.blend:** `blender --background --python workflows/_assemble_allgaeu.py` → open `data/scene_allgaeu-forggensee.blend` in Blender → File ▸ External Data ▸ Make All Paths Absolute, then Pack All Resources → Save As `workflows/scenes/allgaeu-flyover/scene.blend`.

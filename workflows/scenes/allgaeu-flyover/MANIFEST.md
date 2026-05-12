@@ -84,20 +84,57 @@ Changes vs v4 (`workflows/_assemble_allgaeu.py`):
 - Render time: ~85–100 s/frame on RTX 4070 OptiX. 4 frames = ~380 s total.
 - `scene.blend` packed: 259.4 MB (not in git).
 
-**Notes on "cinematic" limitations**: The Allgäu AOI is 10 km × 9 km. With a planar terrain mesh,
-any forward-looking composition aimed past the terrain boundary shows the mesh edge + black void.
-The v5 frames are aerial-photography style (near-oblique, 48–52° off nadir), not "mountains on
-horizon + sky" cinematic. Getting a true horizon shot would require extending the terrain to ≥30 km,
-or adding a distant mountain backdrop mesh. This is noted as a future improvement.
+**v5 limitation**: photo-real oblique aerials, but NO sky / mountains / horizon / clouds in any
+frame (camera too downward-aimed; looking past the terrain edge showed mesh underside + void). → v6.
 
-## How this scene was assembled
+## v6 cinematic-framing pass
 
-`blender --background --python workflows/_assemble_allgaeu.py` → imports heightmap_clean.tif,
-DOP40 UDIM ortho (110 tiles via `<UDIM>` token), 7979 LoD2 buildings, forest-masked GN trees
-(render-hidden for flyover), forest overlay on terrain material, volumetric cumulus deck (2100m base),
-Nishita sky (sun 50° el / 150° az, energy 2.0 W, World strength 0.15), 4 keyframe camera positions
-at 1600–2400m absolute, saves `data/scene_allgaeu-forggensee.blend`, renders 4 stills.
-Final deliverable: `bpy.ops.file.pack_all()` → `scene.blend` (259 MB, not in git).
+Changes vs v5 (`workflows/_assemble_allgaeu.py`) — goal: get **sky + a mountain horizon + broken
+cumulus into frame** while keeping v5's exposure / ortho colours / forest-via-ortho / building roofs.
+
+- **Backdrop ridge mesh** (`BackdropRidge`): the AOI terrain only reaches **1685 m** ASL (no in-AOI
+  alpine peaks — the Säuling/Tegelberg are just outside the polygon). A procedural ridge plane is
+  added ~11 km south of the AOI edge: a 37 km × 2.8 km grid displaced by two CLOUDS-noise textures to
+  peaks ~2300–2900 m, base ~600 m, with a **pure-emission pale-haze-blue material** (no shading → only
+  its jagged silhouette top edge reads against the sky, like distant mountains in atmospheric haze).
+- **Aerial haze**: a faint (density 2.5e-6) low-level (z ≈ 250–2200 m) volume-scatter domain so
+  distance fades and the ridge reads as far away. Kept thin/light to limit render cost & milkiness.
+- **Cameras at altitude**: 4 look-at keyframes, cameras at **1900–2400 m** (above the AOI top), aimed
+  at the AOI midground (Y ≈ −3000, Z ≈ 1200) → pitch ≈ 5–8° below horizontal → foreground lake/meadows
+  in the lower half, the forested AOI hill as the midground subject, the distant ridge on the horizon,
+  Nishita sky in the top ~25–30%. Lenses 28–35 mm, slight banks. Rotation via `Vector.to_track_quat` +
+  a roll matrix (robust vs guessing Euler angles).
+- **World Background Strength 0.30** (was 0.15) — the Nishita sky is now visible above the horizon
+  without blowing the ground (kept tame by the −1.5 EV view transform).
+- **Clouds**: deck 2050–2800 m (cameras just below it), coverage 0.45, density 0.16; cirrus at 6500 m.
+  Plus a **`clouds.py` workaround** in the assemble script: `features/clouds.py` wires the noise to
+  "Object" texcoords assuming a 1×1×1 box, but `_make_cloud_box` applies the box scale (≈14 km) → the
+  noise ran at ~17500 cycles = incoherent per-voxel noise = invisible clouds; the script rescales the
+  cumulus Noise `Scale` inputs by 1/(mesh half-extent) to restore "N blobs across the box".
+- **Blank UDIM corner tiles fixed**: the AOI polygon is a rotated diamond, so ~24 corner tiles of the
+  bbox-aligned DOP40 UDIM grid are empty (pure black) → rendered as a gray slab where the camera caught
+  a bbox corner. Those tiles in `data/processed/ortho_udim/` were overwritten with a mottled
+  dark-forest-green fill so corners read as forest.
+- Render time: ~5 min/frame on RTX 4070 OptiX (volume haze + clouds). 4 frames ≈ 20 min.
+  `scene.blend` packed ≈ 250 MB (not in git).
+- **Honest status**: v6 frames have sky, a distant-ridge horizon and (depending on the noise pattern)
+  some cumulus; v5's exposure + ortho colours + forest read are kept. But the look is "hazy pre-alpine
+  aerial" — the backdrop ridge is a procedural stand-in (not real DGM), the haze can read milky in the
+  high establishing shot, and a true sharp mountain-wall would need real alpine DGM south of the
+  polygon. Shippable as a hero fly-over still; not flawless.
+
+## How this scene was assembled (v6)
+
+`blender --background --python workflows/_assemble_allgaeu.py` → imports `heightmap_clean.tif`,
+DOP40 UDIM ortho (110 tiles via `<UDIM>` token; blank corner tiles backfilled), 7979 LoD2 buildings +
+ortho-textured roofs, forest-masked GN trees (render-hidden for flyover), forest overlay on the
+terrain material, a procedural distant **backdrop ridge** mesh ~11 km south, a faint **aerial-haze**
+volume, a broken **cumulus** deck (2050–2800 m) + **cirrus** (6500 m), Nishita sky (sun 50° el /
+150° az, energy 2.0 W, World strength 0.30, −1.5 EV AgX Med-High Contrast), and **4 look-at camera
+keyframes** at 1900–2400 m (pitch ~5–8° down, aimed at the AOI midground + the ridge horizon). Saves
+`data/scene_allgaeu-forggensee.blend`, renders 4 stills → `renders/allgaeu_v6_frame{0001,0060,0120,0180}.png`.
+Final deliverable: `bpy.ops.file.make_paths_absolute()` + `bpy.ops.file.pack_all()` →
+`workflows/scenes/allgaeu-flyover/scene.blend` (≈ 250 MB, not in git).
 </content>
 
 ---

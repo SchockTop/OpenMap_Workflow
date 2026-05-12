@@ -18,7 +18,7 @@ ap.add_argument("--bbox-utm32n", nargs=4, type=float, required=True,
                 metavar=("XMIN", "YMIN", "XMAX", "YMAX"))
 ap.add_argument("--out-blend", required=True)
 ap.add_argument("--render-png", default="")
-ap.add_argument("--engine", default="BLENDER_EEVEE_NEXT")
+ap.add_argument("--engine", default="BLENDER_EEVEE")
 ap.add_argument("--enable", nargs="*", default=[],
                 help="Feature module names to apply, e.g. buildings-textured trees clouds")
 ap.add_argument("--camera-preset", default="cinematic-establishing",
@@ -48,10 +48,10 @@ cinematic_preset    = importlib.import_module("bl_ext.user_default.blender_tools
 camera_presets      = importlib.import_module("bl_ext.user_default.blender_tools.camera_presets")
 quality_presets     = importlib.import_module("bl_ext.user_default.blender_tools.quality_presets")
 
-# 1. Sky + atmosphere domain cube.
+# 1. Atmosphere domain cube. (The sky/time-of-day preset is applied at step 6a
+# via apply_sky_preset — there is no longer a `setup_sky` operator.)
 xmin, ymin, xmax, ymax = args.bbox_utm32n
 size_x, size_y = xmax - xmin, ymax - ymin
-bpy.ops.blender_tools.setup_sky(preset="client-default")
 # Atmospheric haze — keep cube SHORT so cameras above ~150m AGL see through it.
 # Previously the cube was up to 534 m tall, which made the volumetric scatter
 # blot out the terrain for any aerial-altitude camera (the entire frame went
