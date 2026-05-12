@@ -17,9 +17,12 @@ Geospatial-to-Blender pipeline: downloads Bayern OpenData (DGM1/5, DOP20/40, LoD
 # First-time setup: cd openmap_blender_tools && pip install -e .
 & "C:\ProgramData\anaconda3\python.exe" -m pytest openmap_blender_tools/tests/ -v --ignore=openmap_blender_tools/tests/smoke_*.py
 & "C:\ProgramData\anaconda3\python.exe" -m pytest workflows/tests/ -v --ignore=workflows/tests/visual/
+# OpenMap_Unifier (DOM-Mesh cutout etc.); set $env:DOMMESH_LIVE=1 for the live SLPK cutout test
+& "C:\ProgramData\anaconda3\python.exe" -m pytest OpenMap_Unifier/test_dommesh.py -v
 
 # Smoke tests (need Blender on PATH)
 blender --background --python openmap_blender_tools/tests/smoke_terrain.py
+blender --background --python openmap_blender_tools/tests/smoke_dommesh.py
 
 # Visual regression tests (need full pipeline output)
 & "C:\ProgramData\anaconda3\python.exe" -m pytest workflows/tests/visual/ -v
