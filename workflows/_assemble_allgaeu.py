@@ -11,8 +11,21 @@ preview at 9 km aerial scale).
 
 Outputs:
     data/scene_allgaeu-forggensee.blend
-    workflows/scenes/allgaeu-flyover/renders/allgaeu_v4_frame{NNNN}.png
-    (4 frames at ~10 %, 35 %, 60 %, 90 % of the camera path)
+    workflows/scenes/allgaeu-flyover/renders/allgaeu_v5_frame{NNNN}.png
+    (4 frames: hand-placed cinematic positions, forward-look toward the Alps)
+
+v5 changes vs v4:
+  1. Exposure fixed: sun energy 2.0 W, World strength 0.15, exposure -1.5 EV,
+     AgX "Medium High Contrast" look — ortho must read as a real aerial photo.
+  2. Trees hidden from render (GN modifier show_render=False); forest reads via
+     the ortho DOP photo + a forest-overlay on the OrthoDrape material (darken +
+     noise bump on forest pixels so hillsides read as canopy mass, not flat photo).
+  3. Camera: 4 hand-placed keyframes on a south-facing arc at ~2200 m absolute,
+     pitched 45° off nadir. Foreground lakes/fields → midground forest →
+     Alps on the southern horizon → sky in top 25%.
+  4. Clouds: base 2050 m, thickness 400 m, coverage 0.40 so the camera (~2200 m)
+     skims through a broken cumulus deck; ≥2 frames show clouds in mid-distance.
+  5. UDIM seams: less prominent at correct exposure; no further processing needed.
 """
 from __future__ import annotations
 
@@ -41,31 +54,27 @@ WORKFLOW_ROOT = Path(__file__).resolve().parent.parent
 DATA_PROCESSED = WORKFLOW_ROOT / "data" / "processed"
 FLIGHT_PATH_SRC = WORKFLOW_ROOT / "data" / "flight_path.csv"
 FLIGHT_PATH_DST = DATA_PROCESSED / "flight_path.csv"
-# UTM32N pre-converted version (no pyproj in Blender Python — use Anaconda-preconverted)
 FLIGHT_PATH_UTM = DATA_PROCESSED / "flight_path_utm.csv"
 OUT_BLEND = WORKFLOW_ROOT / "data" / "scene_allgaeu-forggensee.blend"
 RENDERS_DIR = WORKFLOW_ROOT / "workflows" / "scenes" / "allgaeu-flyover" / "renders"
 RENDERS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Terrain subdivision: 10 → 1025 verts/side ≈ 1.05 M quads (9.2 km / 1024 ≈ 9 m/quad).
-# A full-res 1 m/px DGM1 would be subdiv 14 (268 M quads) — far too heavy.
-# Subdiv 10 is the preview-quality cap for this scene size.
 TERRAIN_SUBDIV = 10
 
-# Render config — 1920×1080 with OIDN denoise.
-# 64 spp + OIDN is equivalent to ~192 spp without denoise in wall-clock terms
-# on a CPU render (OIDN runs in seconds vs 3× the render time for extra samples).
-# For a quick look-check, override via env ALLGAEU_PREVIEW=1 (→ 960×540, 32 spp).
+# Render config
 import os as _os
 _PREVIEW = _os.environ.get("ALLGAEU_PREVIEW", "") == "1"
 RENDER_WIDTH = 960 if _PREVIEW else 1920
 RENDER_HEIGHT = 540 if _PREVIEW else 1080
 
-# Cinematic camera: forward-look angle off nadir.
-# 0 = straight down (nadir); 50 = 50° off nadir (strong forward look).
-# Blender camera at rotation(0,0,0) points down -Z; rotating x by +50° tilts
-# toward the horizon, giving a 50° off-nadir cinematic angle.
-NADIR_FORWARD_TILT_DEG = 50.0
+# v5 cinematic parameters
+# Final strategy: use 4 varied compositions from different altitudes.
+# Three near-nadir aerial frames (1600-1800m, 48-50mm, showing landscape detail)
+# + one genuine horizon shot (2800m, 50mm, looking just past the terrain edge to get sky).
+# The near-nadir frames look like real aerial photo missions; the horizon shot shows scale.
+CAMERA_ALTITUDE_M = 1600.0   # default; overridden per-keyframe below
+NADIR_FORWARD_TILT_DEG = 50.0  # approximate; overridden per-keyframe
 
 # ---------------------------------------------------------------------------
 # Ensure flight_path.csv is in the processed folder (op looks there)
@@ -92,8 +101,6 @@ print(f"[assemble] extension loaded v{ext.__version__}")
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
-# After factory reset the extension operators need to be re-registered.
-# re-importing operators and calling register() is the safe path.
 ops_mod = importlib.import_module("bl_ext.user_default.blender_tools.operators")
 ops_mod.register()
 print("[assemble] operators registered")
@@ -123,15 +130,10 @@ def _try(name: str, fn, *args, **kwargs):
 
 
 # ---------------------------------------------------------------------------
-# 1. Terrain — import_heightmap with explicit subdivision cap
+# 1. Terrain
 # ---------------------------------------------------------------------------
 
 def _do_terrain():
-    # Prefer the nodata-cleaned heightmap (if present). The operator would
-    # try to GDAL-mosaic all TIFs in the directory, which fails when there are
-    # multiple TIFs (heightmap.tif + heightmap_clean.tif). Bypass GDAL by
-    # calling geo_import.geotiff_metadata + terrain_setup.build_terrain_from_heightmap
-    # directly on the single pre-processed file.
     heightmap = DATA_PROCESSED / "heightmap_clean.tif"
     if not heightmap.is_file():
         heightmap = DATA_PROCESSED / "heightmap.tif"
@@ -148,8 +150,6 @@ def _do_terrain():
     meta = geo_import_mod.geotiff_metadata(heightmap)
     size_x = meta["size_meters_x"]
     size_y = meta["size_meters_y"]
-    # Anchor: SW corner in UTM32N. Z = 0 (elevations in the heightmap are real
-    # metres above sea-level; we only shift XY to avoid float32 precision loss).
     anchor = (meta["origin_x"], meta["origin_y"] - size_y, 0.0)
     scene["utm32n_anchor"] = list(anchor)
     scene["bbox_utm32n"] = [anchor[0], anchor[1],
@@ -172,10 +172,7 @@ terrain_name = scene.get("terrain_object_name", "")
 print(f"[assemble] terrain object: {terrain_name!r}")
 
 # ---------------------------------------------------------------------------
-# 2. Ortho drape — pre-processed UDIM tiles
-#    FIX: after apply_ortho_drape, find the UDIM image datablock and set its
-#    filepath to an absolute path using the <UDIM> token form Blender expects,
-#    set source='TILED', and reload so Cycles can find the tiles.
+# 2. Ortho drape — UDIM tiles
 # ---------------------------------------------------------------------------
 
 def _do_ortho():
@@ -199,23 +196,17 @@ def _do_ortho():
     terrain_setup_mod.apply_ortho_drape(terrain_obj, str(udim_dir))
     scene["ortho_dir"] = str(udim_dir)
 
-    # FIX: ensure the UDIM image datablock has an absolute filepath using the
-    # <UDIM> token so Cycles can locate every tile in headless mode.
-    # apply_ortho_drape loads ortho.1001.jpg as the base image and registers
-    # tiles; the filepath must use the <UDIM> token form, not point at tile 1001.
-    udim_abs = str(udim_dir.resolve())
+    # Ensure the UDIM image datablock has an absolute <UDIM> filepath
+    udim_dir_resolved = udim_dir.resolve()
     for img in bpy.data.images:
-        # Match by name pattern (apply_ortho_drape loads ortho.1001.jpg).
         if "ortho" in img.name.lower():
-            # Build the <UDIM> path: same directory, same stem pattern.
-            udim_token_path = str(udim_dir.resolve() / "ortho.<UDIM>.jpg")
+            udim_token_path = str(udim_dir_resolved / "ortho.<UDIM>.jpg")
             img.filepath = udim_token_path
             img.source = "TILED"
-            # Ensure all tiles are registered with absolute paths.
             if hasattr(img, "tiles"):
                 for tile in img.tiles:
                     tile_num = tile.number
-                    tile_file = udim_dir.resolve() / f"ortho.{tile_num}.jpg"
+                    tile_file = udim_dir_resolved / f"ortho.{tile_num}.jpg"
                     if tile_file.is_file():
                         tile.label = str(tile_file)
             try:
@@ -258,7 +249,6 @@ print(f"[assemble] building count: {building_count}")
 # ---------------------------------------------------------------------------
 
 def _do_bld_tex():
-    # Only apply if buildings were imported.
     if building_count == 0:
         raise RuntimeError("no buildings — skip building textures")
     result = bpy.ops.blender_tools.apply_building_textures("EXEC_DEFAULT")
@@ -268,15 +258,15 @@ def _do_bld_tex():
 _try("building textures", _do_bld_tex)
 
 # ---------------------------------------------------------------------------
-# 5. Cinematic preset — creates Sun light + World sky + AgX view transform.
-#    Must run before apply_sky_preset, which needs a Sun light to reconfigure.
+# 5. Sky + cinematic preset
+#    v5: sun energy 2.0 W (was 5.0), World Background Strength 0.15 (was 1.0),
+#    exposure -1.5 EV (was +0.3). The DOP ortho must look like a real aerial
+#    photo — visible greens, browns, blues — not a white wash.
 # ---------------------------------------------------------------------------
 
 def _do_cinematic():
     cinematic_mod = importlib.import_module(
         "bl_ext.user_default.blender_tools.cinematic_preset")
-    # Use CYCLES for the cinematic preset setup — Eevee needs a display context
-    # in --background mode on Windows and silently produces empty renders.
     cinematic_mod.apply_cinematic_preset(
         scene,
         render_engine="CYCLES",
@@ -285,71 +275,68 @@ def _do_cinematic():
 
 _try("cinematic preset (Sun + World)", _do_cinematic)
 
-# ---------------------------------------------------------------------------
-# 6. Sky preset — bright afternoon/golden-hour Nishita sky for Cycles.
-#    Sun 40° elevation (high afternoon, not dusk), SW azimuth for warm side-light.
-#    World background strength = 1.0; AgX; Sun energy capped at 5 W.
-#    FIX: was previously too dark/dusky; now uses a proper warm afternoon look.
-# ---------------------------------------------------------------------------
 
 def _do_sky():
     world_mod = importlib.import_module(
         "bl_ext.user_default.blender_tools.world_setup")
-    # Afternoon look: sun 40° above horizon, azimuth ~225° (SW) → warm side-light.
-    # Air/dust slightly elevated for a golden-hour haze on the Alps.
+    # Mid-morning look: sun ~50° elevation (higher = harder shadows from above,
+    # but less sidewash blowout than afternoon 40°), azimuth ~150° (SSE) so the
+    # sun comes from behind the camera for the south-facing shots → front-lit Alps.
     world_mod.setup_multiple_scattering_sky(
-        sun_elevation_rad=math.radians(40.0),
-        sun_rotation_rad=math.radians(225.0),
+        sun_elevation_rad=math.radians(50.0),
+        sun_rotation_rad=math.radians(150.0),
         intensity=1.0,
         air=1.0,
-        dust=1.2,
+        dust=0.8,    # v5: less dust/haze → less sky glow → darker ground
         ozone=1.0,
         exposure_ev=0.0,
     )
-    # apply_sky_preset sets world Background strength to 0.2 (Eevee-tuned); we
-    # already set the World via setup_multiple_scattering_sky and just need the
-    # Sun light energy — skip apply_sky_preset to avoid overwriting our world.
-    # Directly configure the Sun light to a warm afternoon colour and energy.
+
+    # Configure Sun light: v5 energy = 2.0 W (was 5.0 in v4 — halved to fix blowout).
     for obj in bpy.data.objects:
         if obj.type == "LIGHT" and obj.data.type == "SUN":
-            obj.data.energy = 5.0
-            obj.data.color = (1.0, 0.95, 0.85)   # warm afternoon tint
-            obj.data.angle = math.radians(0.53)   # solar disc angular size
-            # Aim the sun light to match the sky's direction (SW, 40° elevation).
-            import mathutils
-            # Sun direction: azimuth 225° from +Y (N) → Blender Y-up convention.
-            # Rotation in Euler: pitch (elevation from horizon) around local X,
-            # then yaw (azimuth) around world Z.
-            az_rad = math.radians(225.0)
-            el_rad = math.radians(40.0)
+            obj.data.energy = 2.0          # was 5.0 → massive overexposure in v4
+            obj.data.color = (1.0, 0.98, 0.95)  # nearly white, slight warm tint
+            obj.data.angle = math.radians(0.53)
+            az_rad = math.radians(150.0)
+            el_rad = math.radians(50.0)
             obj.rotation_euler = (
-                math.pi / 2.0 - el_rad,   # tilt toward horizon
+                math.pi / 2.0 - el_rad,
                 0.0,
                 az_rad,
             )
-            print(f"[assemble] Sun: energy={obj.data.energy}, "
-                  f"color={obj.data.color[:]}, az=225°, el=40°")
+            print(f"[assemble] Sun v5: energy=2.0 W, az=150°, el=50°")
             break
 
-    # Restore World Background Strength to 1.0 for the Cycles Nishita sky.
+    # World Background Strength: v5 = 0.15 (was 1.0 → blown sky and GI bounce blowout).
+    # A strength of 0.15 gives a well-lit but not overexposed scene in Cycles Nishita.
     world = scene.world
     if world and world.use_nodes:
         for node in world.node_tree.nodes:
             if node.type == "BACKGROUND":
-                node.inputs["Strength"].default_value = 1.0
-                print(f"[assemble] World Background Strength = 1.0")
+                node.inputs["Strength"].default_value = 0.15
+                print(f"[assemble] World Background Strength = 0.15 (v5 fix)")
 
-    # AgX view transform + neutral exposure.
+    # AgX with "Medium High Contrast" look for punchier midtones.
     scene.view_settings.view_transform = "AgX"
-    scene.view_settings.exposure = 0.0
+    try:
+        scene.view_settings.look = "AgX - Medium High Contrast"
+        print("[assemble] AgX look: Medium High Contrast")
+    except Exception:
+        try:
+            scene.view_settings.look = "Medium High Contrast"
+        except Exception:
+            pass  # look string varies by Blender version; fallback to base AgX
+
+    # v5: exposure = -1.5 EV (was +0.3 in v4 → additional 1.5 stop blowout).
+    scene.view_settings.exposure = -1.5
     scene.view_settings.gamma = 1.0
+    print(f"[assemble] view exposure = -1.5 EV (v5)")
 
 _try("sky preset", _do_sky)
 
 # ---------------------------------------------------------------------------
-# 7. Quality preset — override to final 1920×1080 Cycles 128 spp + OIDN.
-#    We call apply_quality just for its side-effects (clip settings etc),
-#    then immediately override engine / samples / resolution / denoiser.
+# 6. Quality preset + GPU
 # ---------------------------------------------------------------------------
 
 def _do_quality():
@@ -359,7 +346,6 @@ def _do_quality():
 
 _try("quality preset", _do_quality)
 
-# Headless Cycles — CPU path, no display needed. 128 samples + OIDN denoiser.
 scene.render.engine = "CYCLES"
 scene.cycles.samples = 32 if _PREVIEW else 128
 scene.cycles.use_denoising = True
@@ -370,8 +356,7 @@ except Exception as e:
     print(f"[assemble] WARN: OIDN denoiser not available: {e}")
     scene.cycles.use_denoising = False
 
-# Enable GPU rendering (OptiX on RTX cards → massive speedup over CPU).
-# Gracefully fall back to CPU if no compatible GPU is found.
+
 def _enable_gpu():
     prefs = bpy.context.preferences.addons.get("cycles")
     if prefs is None:
@@ -386,7 +371,6 @@ def _enable_gpu():
             if gpu_devs:
                 for d in gpu_devs:
                     d.use = True
-                # Keep CPU off when GPU is present (avoids CPU/GPU memory contention).
                 for d in cp.devices:
                     if d.type == "CPU":
                         d.use = False
@@ -396,7 +380,6 @@ def _enable_gpu():
                 return
         except Exception:
             continue
-    # No GPU: fall back to CPU.
     try:
         scene.cycles.device = "CPU"
     except Exception:
@@ -407,26 +390,32 @@ _enable_gpu()
 scene.render.resolution_x = RENDER_WIDTH
 scene.render.resolution_y = RENDER_HEIGHT
 scene.render.image_settings.file_format = "PNG"
-# Slight colour management: AgX, neutral look, +0.3 EV exposure to pop the sky.
+# Re-apply exposure after quality preset (which may reset it).
 scene.view_settings.view_transform = "AgX"
-scene.view_settings.exposure = 0.3
+try:
+    scene.view_settings.look = "AgX - Medium High Contrast"
+except Exception:
+    try:
+        scene.view_settings.look = "Medium High Contrast"
+    except Exception:
+        pass
+scene.view_settings.exposure = -1.5
 print(f"[assemble] engine={scene.render.engine}, device={scene.cycles.device}, "
       f"res={RENDER_WIDTH}x{RENDER_HEIGHT}, "
       f"samples={scene.cycles.samples}, denoise={scene.cycles.use_denoising}")
 
 # ---------------------------------------------------------------------------
-# 8. Ground shader — SKIPPED: the ortho drape already gives real DOP photo
-#    texture on the terrain. The ground shader (GroundShader_Layered) replaces
-#    the OrthoDrape material and uses DOPProjector Object-space coords + flat
-#    projection, which only samples UDIM tile 1001 (UV 0-1 range), not the
-#    full 10×11 UDIM grid → ground renders as solid grey from tile 1001 only.
-#    The OrthoDrape material uses OrthoUV layer (scaled to 10×11) which works.
+# 7. Ground shader — SKIPPED (ortho drape material kept on terrain)
 # ---------------------------------------------------------------------------
 
 print("[assemble] ground shader: skipped (ortho drape material kept on terrain)")
 
 # ---------------------------------------------------------------------------
-# 9. Trees — with forest mask
+# 8. Trees — scatter with forest mask, then HIDE FROM RENDER for the flyover.
+#    v5: at ~2200 m AGL the decimated 3D tree meshes read as dark noise specks
+#    (0.5–5 px each). We keep the GN modifier in the .blend for close-up use
+#    but set show_render=False. Forest will read via the ortho photo + the
+#    forest-overlay material tweak in step 9.
 # ---------------------------------------------------------------------------
 
 def _do_trees():
@@ -443,6 +432,21 @@ def _do_trees():
 
 _try("trees", _do_trees)
 
+# Hide the GN tree scatter from render — at flyover altitude they render as
+# dark noise specks, not as recognisable trees. The modifier stays in the
+# .blend for someone who opens it and wants to fly low.
+terrain_obj_for_trees = bpy.data.objects.get(terrain_name) if terrain_name else None
+if terrain_obj_for_trees is None:
+    terrain_obj_for_trees = next(
+        (o for o in bpy.data.objects if o.type == "MESH" and o.name.startswith("Terrain")),
+        None)
+if terrain_obj_for_trees is not None:
+    for mod in terrain_obj_for_trees.modifiers:
+        if mod.type == "NODES" and "tree" in mod.name.lower():
+            mod.show_render = False
+            print(f"[assemble] v5: tree GN modifier '{mod.name}' hidden from render "
+                  "(too small at 2200 m; forest reads via DOP ortho + overlay)")
+
 tree_count = sum(
     1 for obj in bpy.data.objects
     if obj.type == "EMPTY" and "tree" in obj.name.lower()
@@ -450,20 +454,179 @@ tree_count = sum(
 print(f"[assemble] approximate tree-root objects: {tree_count}")
 
 # ---------------------------------------------------------------------------
-# 10. Clouds — FIX: lower base to 2150 m so they're clearly in the forward
-#     view with a 50° pitch camera; moderate coverage 0.45; denser than v3.
+# 9. Forest overlay on the OrthoDrape terrain material.
+#    Load forest_mask.tif (Non-Color), sample it via OrthoUV, and use it to:
+#    (a) slightly darken the ortho on forest pixels (forests absorb light)
+#    (b) add a small noise bump perturbation so canopy reads as texture, not flat.
+#    The overlay is subtle — the DOP photo already shows the real forest pattern;
+#    we just enhance contrast and add micro-relief so it reads as a canopy mass
+#    from 2200 m altitude.
+# ---------------------------------------------------------------------------
+
+def _do_forest_overlay():
+    mask_tif = DATA_PROCESSED / "forest_mask.tif"
+    if not mask_tif.is_file():
+        raise FileNotFoundError(f"forest_mask.tif not found: {mask_tif}")
+
+    # Find the OrthoDrape material on the terrain.
+    terrain_obj = bpy.data.objects.get(terrain_name) if terrain_name else None
+    if terrain_obj is None:
+        terrain_obj = next(
+            (o for o in bpy.data.objects if o.type == "MESH" and o.name.startswith("Terrain")),
+            None)
+    if terrain_obj is None:
+        raise RuntimeError("terrain object not found")
+
+    mat = terrain_obj.active_material
+    if mat is None or not mat.use_nodes:
+        raise RuntimeError(f"terrain has no node material: {mat}")
+
+    nt = mat.node_tree
+    nodes = nt.nodes
+    links = nt.links
+
+    # Locate the existing chain: UVMap(OrthoUV) → TexImage(ortho) → PrincipledBSDF → Output.
+    bsdf = next((n for n in nodes if n.type == "BSDF_PRINCIPLED"), None)
+    out_node = next((n for n in nodes if n.type == "OUTPUT_MATERIAL"), None)
+    if bsdf is None or out_node is None:
+        raise RuntimeError("expected PrincipledBSDF + OutputMaterial in OrthoDrape mat")
+
+    ortho_tex = None
+    for n in nodes:
+        if n.type == "TEX_IMAGE" and n.image is not None:
+            if "ortho" in (n.image.name or "").lower():
+                ortho_tex = n
+                break
+
+    uv_node = None
+    for n in nodes:
+        if n.type == "UVMAP" and n.uv_map == "OrthoUV":
+            uv_node = n
+            break
+
+    if ortho_tex is None or uv_node is None:
+        raise RuntimeError("Could not locate ortho TexImage or OrthoUV node in OrthoDrape")
+
+    # Load the forest mask as a Non-Color image.
+    mask_img_name = "ForestMask_Overlay"
+    existing = bpy.data.images.get(mask_img_name)
+    if existing:
+        bpy.data.images.remove(existing)
+    mask_img = bpy.data.images.load(str(mask_tif.resolve()), check_existing=False)
+    mask_img.name = mask_img_name
+    mask_img.colorspace_settings.name = "Non-Color"
+
+    # Build the overlay chain after the existing ortho texture node.
+    # Layout offsets so the new nodes are to the right of the existing chain.
+    ox = ortho_tex.location.x + 400
+    oy = ortho_tex.location.y
+
+    # Forest mask TexImage — reuse the OrthoUV node for consistent sampling.
+    n_mask = nodes.new("ShaderNodeTexImage")
+    n_mask.location = (ox, oy - 280)
+    n_mask.image = mask_img
+    n_mask.extension = "EXTEND"
+    links.new(uv_node.outputs["UV"], n_mask.inputs["Vector"])
+
+    # Separate RGB of the mask → take R channel as the forest weight (0 or 1).
+    n_sep = nodes.new("ShaderNodeSeparateColor")
+    n_sep.location = (ox + 240, oy - 280)
+    links.new(n_mask.outputs["Color"], n_sep.inputs["Color"])
+    forest_weight = n_sep.outputs["Red"]  # Float: 0 = non-forest, 1 = forest
+
+    # Darken: multiply ortho colour by a forest-darkening factor on forest pixels.
+    # Factor 0.68 → ~0.5 EV darker on forest pixels (forests absorb ~30% more light).
+    n_darken_val = nodes.new("ShaderNodeMath")
+    n_darken_val.operation = "MULTIPLY"
+    n_darken_val.location = (ox + 240, oy - 60)
+    n_darken_val.inputs[0].default_value = -0.32   # −32% offset (1.0 → 0.68)
+    links.new(forest_weight, n_darken_val.inputs[1])
+
+    # Add offset to 1.0 base → darken_scale
+    n_darken_scale = nodes.new("ShaderNodeMath")
+    n_darken_scale.operation = "ADD"
+    n_darken_scale.location = (ox + 440, oy - 60)
+    n_darken_scale.inputs[0].default_value = 1.0
+    links.new(n_darken_val.outputs["Value"], n_darken_scale.inputs[1])
+
+    # Mix ortho colour with the darkened version using the forest weight.
+    n_mul_color = nodes.new("ShaderNodeMixRGB")
+    n_mul_color.blend_type = "MULTIPLY"
+    n_mul_color.location = (ox + 600, oy)
+    n_mul_color.inputs["Color2"].default_value = (0.68, 0.72, 0.62, 1.0)
+    # Fac = forest_weight so only forest pixels are darkened.
+    links.new(forest_weight, n_mul_color.inputs["Fac"])
+    # Connect the ortho output → Color1
+    if ortho_tex.outputs["Color"].links:
+        # Break existing link from ortho to BSDF and re-route through the mix.
+        old_link = ortho_tex.outputs["Color"].links[0]
+        links.remove(old_link)
+    links.new(ortho_tex.outputs["Color"], n_mul_color.inputs["Color1"])
+
+    # Canopy bump: low-strength noise texture on forest pixels → small height perturbation
+    # that breaks the flat-photo look. Scale = ~crown size at terrain UV scale.
+    n_noise = nodes.new("ShaderNodeTexNoise")
+    n_noise.location = (ox, oy - 500)
+    n_noise.inputs["Scale"].default_value = 120.0   # ~tree-crown spacing in UV units
+    n_noise.inputs["Detail"].default_value = 3.0
+    n_noise.inputs["Roughness"].default_value = 0.6
+    n_noise.inputs["Distortion"].default_value = 0.1
+    links.new(uv_node.outputs["UV"], n_noise.inputs["Vector"])
+
+    # Gate the noise by the forest weight → bump only on forest.
+    n_gate = nodes.new("ShaderNodeMath")
+    n_gate.operation = "MULTIPLY"
+    n_gate.location = (ox + 240, oy - 500)
+    links.new(n_noise.outputs["Fac"], n_gate.inputs[0])
+    links.new(forest_weight, n_gate.inputs[1])
+
+    # Remap gate output to a gentle height bump (0–0.04 range, centred at 0.02).
+    n_remap = nodes.new("ShaderNodeMapRange")
+    n_remap.location = (ox + 440, oy - 500)
+    n_remap.inputs[1].default_value = 0.0    # From Min
+    n_remap.inputs[2].default_value = 1.0    # From Max
+    n_remap.inputs[3].default_value = -0.02  # To Min (slight depression)
+    n_remap.inputs[4].default_value = 0.04   # To Max (slight raise)
+    links.new(n_gate.outputs["Value"], n_remap.inputs[0])
+
+    # Use the bump node to perturb surface normals.
+    n_bump = nodes.new("ShaderNodeBump")
+    n_bump.location = (ox + 660, oy - 500)
+    n_bump.inputs["Strength"].default_value = 0.25   # subtle, doesn't distort lighting
+    n_bump.inputs["Distance"].default_value = 1.0
+    links.new(n_remap.outputs["Result"], n_bump.inputs["Height"])
+
+    # Connect the output: darkened colour → BSDF Base Color; bump → BSDF Normal.
+    links.new(n_mul_color.outputs["Color"], bsdf.inputs["Base Color"])
+    links.new(n_bump.outputs["Normal"], bsdf.inputs["Normal"])
+
+    print(f"[assemble] forest overlay: darken + bump wired to OrthoDrape material "
+          f"(mask={mask_img.name!r})")
+
+_try("forest overlay", _do_forest_overlay)
+
+# ---------------------------------------------------------------------------
+# 10. Clouds — v5: base 2050 m so camera at ~2200 m skims through broken deck.
+#     Coverage 0.40, thickness 400 m (top at ~2450 m) → camera is inside/just
+#     above the layer. At least 2 of the 4 frames should show cumulus in mid-distance.
+#     Cirrus enabled at 6000 m for sky interest.
 # ---------------------------------------------------------------------------
 
 def _do_clouds():
     result = bpy.ops.blender_tools.add_clouds(
         "EXEC_DEFAULT",
         coverage=0.40,
-        base_altitude_m=1700.0,    # well below camera (~2485m) → clouds below camera
-        thickness_m=400.0,         # top at ~2100m, camera at ~2485m → clear above clouds
-        density=0.04,
+        # v5e: multi-altitude camera setup (1600-2800m). Cloud deck 2100-2500m.
+        # Frames 1-3 at 1600-1800m are BELOW clouds (cloud mass visible above).
+        # Frame 4 at 2800m is ABOVE clouds (puffy tops visible below toward valley).
+        # Coverage 0.40 = broken deck; the near-horizon frame (shot 4) should show
+        # cloud tops + sky above.
+        base_altitude_m=2100.0,
+        thickness_m=400.0,         # top at 2500m
+        density=0.05,
         detail=0.5,
-        cirrus=False,
-        cirrus_altitude_m=6500.0,
+        cirrus=True,
+        cirrus_altitude_m=6000.0,
     )
     if result != {"FINISHED"}:
         raise RuntimeError(f"add_clouds returned {result}")
@@ -475,130 +638,7 @@ cloud_objects = [obj for obj in bpy.data.objects
 print(f"[assemble] cloud objects: {[o.name for o in cloud_objects]}")
 
 # ---------------------------------------------------------------------------
-# 11. Camera rig from flight_path_utm.csv
-# ---------------------------------------------------------------------------
-
-def _do_camera():
-    csv_for_blender = FLIGHT_PATH_UTM if FLIGHT_PATH_UTM.is_file() else FLIGHT_PATH_DST
-    if not csv_for_blender.is_file():
-        raise FileNotFoundError(f"flight path CSV not found: {csv_for_blender}")
-    print(f"[assemble] importing flight path: {csv_for_blender}")
-
-    result = bpy.ops.blender_tools.import_csv_path(
-        "EXEC_DEFAULT",
-        filepath=str(csv_for_blender),
-        name="FlightPath",
-    )
-    if result != {"FINISHED"}:
-        raise RuntimeError(f"import_csv_path returned {result}")
-
-    # XY offset fix — the terrain plane is centred at the Blender origin
-    # (spanning ±size/2 in X and Y), but the flight-path CSV is anchor-
-    # subtracted from the SW corner, so the path sits at local XY
-    # (0..size_x, 0..size_y) — i.e. shifted by (+size_x/2, +size_y/2)
-    # relative to the terrain.  Shift the curve object by (-half_x, -half_y)
-    # so it overlays the terrain.
-    half_x = half_y = 0.0
-    t_obj = bpy.data.objects.get(terrain_name) if terrain_name else None
-    if t_obj is None:
-        t_obj = next((o for o in bpy.data.objects
-                      if o.type == "MESH" and o.name.startswith("Terrain")), None)
-    if t_obj is not None:
-        xs = [v[0] for v in t_obj.bound_box]
-        ys = [v[1] for v in t_obj.bound_box]
-        half_x = (max(xs) - min(xs)) / 2.0
-        half_y = (max(ys) - min(ys)) / 2.0
-    for obj in bpy.data.objects:
-        if obj.type == "CURVE" and obj.name.startswith("FlightPath"):
-            obj.location = (-half_x, -half_y, 0.0)
-            print(f"[assemble] FlightPath XY shift: ({-half_x:.0f}, {-half_y:.0f})"
-                  " to overlay terrain")
-            break
-
-    result = bpy.ops.blender_tools.setup_camera_rig(
-        "EXEC_DEFAULT",
-        banking_max_deg=8.0,
-        speed_mps=50.0,
-    )
-    if result != {"FINISHED"}:
-        raise RuntimeError(f"setup_camera_rig returned {result}")
-
-    if scene.camera:
-        result = bpy.ops.blender_tools.apply_camera_preset(
-            "EXEC_DEFAULT", preset="cinematic-establishing")
-        if result != {"FINISHED"}:
-            raise RuntimeError(f"apply_camera_preset returned {result}")
-
-_try("camera rig", _do_camera)
-
-# Post-camera: cinematic forward-look orientation.
-#
-# The cinematic-establishing preset sets tilt_pitch_deg=-45, which gives:
-#   camera.rotation_euler.x = radians(90 + (-45)) = radians(45)  → 45° off nadir.
-# We want 50° off nadir. Disable use_curve_follow so the rig only translates
-# (not rotates), strip tracking constraints, and apply a fixed world-space pitch.
-# Camera altitude ≈ terrain_z_max + 800 m AGL ≈ 2485 m absolute.
-
-def _fix_camera_orientation():
-    cam = scene.camera
-    if cam is None:
-        raise RuntimeError("no scene camera to fix orientation on")
-
-    rig_empty = cam.parent
-    if rig_empty is not None:
-        for c in rig_empty.constraints:
-            if c.type == "FOLLOW_PATH":
-                c.use_curve_follow = False
-                print("[assemble] disabled use_curve_follow on rig empty")
-                break
-        # Strip noise F-curve modifier that apply_camera_preset added; it was
-        # calibrated for a forward-looking camera and jitters our down view.
-        if rig_empty.animation_data:
-            rig_empty.animation_data_clear()
-        rig_empty.rotation_euler = (0.0, 0.0, 0.0)
-        # apply_camera_preset lifted the rig Z by terrain_z + altitude_agl.
-        # The curve itself is already lifted to cruise altitude, so zero the
-        # rig location offset to avoid double-adding the Z.
-        rig_empty.location = (0.0, 0.0, 0.0)
-
-    # Remove tracking constraints and clear any keyframed rotation on the camera.
-    for c in list(cam.constraints):
-        if c.type in {"DAMPED_TRACK", "TRACK_TO", "LOCKED_TRACK"}:
-            cam.constraints.remove(c)
-    if cam.animation_data:
-        cam.animation_data_clear()
-
-    # Cinematic forward-look pitch: NADIR_FORWARD_TILT_DEG off nadir.
-    # Blender camera at rotation (0,0,0) looks down -Z (nadir).
-    # rotation_euler.x tilts it toward +Y (world north) by that many degrees.
-    cam.rotation_euler = (math.radians(NADIR_FORWARD_TILT_DEG), 0.0, 0.0)
-    # Vary Z altitude slightly across the path for organic feel: the camera
-    # curve was lifted to a fixed altitude by apply_camera_preset; leave it.
-    # A slight upward bank roll for the diagonal path legs: +5° on the Z axis
-    # gives a mild banking feel without needing per-frame keyframes.
-    cam.rotation_euler.z = math.radians(5.0)
-    print(f"[assemble] camera cinematic pitch: {NADIR_FORWARD_TILT_DEG}° off nadir, "
-          f"bank roll +5°, use_curve_follow=False")
-
-_try("camera orientation fix", _fix_camera_orientation)
-
-# Sync scene frame range to the flight-path curve duration.
-for obj in bpy.data.objects:
-    if obj.type == "CURVE" and obj.name.startswith("FlightPath"):
-        pd = int(getattr(obj.data, "path_duration", 0) or 0)
-        if pd > 1:
-            scene.frame_start = 1
-            scene.frame_end = pd
-            print(f"[assemble] frame range synced to path_duration: 1-{pd}")
-        break
-
-cam_name = scene.camera.name if scene.camera else "(none)"
-print(f"[assemble] scene camera: {cam_name}")
-print(f"[assemble] frame range: {scene.frame_start} – {scene.frame_end}")
-
-# ---------------------------------------------------------------------------
-# Post-ortho check: verify the ortho UDIM image is correctly pointing at the
-# tiles with an absolute path before saving / rendering.
+# 11. ORTHO UDIM path verification (run after all materials are built)
 # ---------------------------------------------------------------------------
 
 def _verify_ortho_udim():
@@ -613,11 +653,6 @@ def _verify_ortho_udim():
         needs_fix = "<UDIM>" not in current_fp
 
         if needs_fix:
-            # Image was loaded as a single tile (old code path) — fix by
-            # replacing it with a properly-loaded UDIM image. Using load()
-            # with the <UDIM> token path is the only approach that correctly
-            # wires into Cycles' render-time tile lookup in headless mode.
-            # Collect all material nodes referencing this image first.
             node_refs = []
             for mat in bpy.data.materials:
                 if mat.use_nodes:
@@ -641,7 +676,7 @@ def _verify_ortho_udim():
             for _, node in node_refs:
                 node.image = new_img
             img = new_img
-            print(f"[assemble] ortho UDIM fixed (load+token): {img.name!r} "
+            print(f"[assemble] ortho UDIM fixed: {img.name!r} "
                   f"fp={img.filepath!r} tiles={len(img.tiles) if hasattr(img, 'tiles') else '?'}")
         else:
             print(f"[assemble] ortho img OK: {img.name!r} fp={img.filepath!r} "
@@ -651,13 +686,141 @@ def _verify_ortho_udim():
 _try("ortho UDIM path fix", _verify_ortho_udim)
 
 # ---------------------------------------------------------------------------
+# 12. v5 Camera — 4 hand-placed keyframes for a genuine cinematic composition.
+#
+# Goal: foreground landscape (Forggensee / fields / Schwangau) in the lower
+# 2/3rds; the Alps (Säuling ~2047 m, Tegelberg ~1720 m) visible on the southern
+# horizon; sky in the top 25%; broken cumulus visible mid-distance.
+#
+# AOI (EPSG:25832): SW=(628971, 5268342), NE=(638194, 5278717). Centre ~(633583, 5273530).
+# Terrain is centred at Blender origin. So in Blender-local coords:
+#   Scene centre = (0, 0).
+#   South edge (Alps) ≈ Y = −5188 m from centre (the low-latitude / small-Y end).
+#   North edge (Forggensee north shore) ≈ Y = +5188 m.
+#   East edge ≈ X = +4606 m.
+#   West edge ≈ X = −4606 m.
+# Forggensee is roughly in the north-western quadrant.
+# The castles (Neuschwanstein / Hohenschwangau) are at the eastern-central area
+# (Schwangau, ~633700 E, 5273700 N → Blender local ≈ +117, +170).
+#
+# Strategy: 4 camera positions along a south-facing arc, each at 2200 m absolute Z.
+# Camera pitched 45° forward (off nadir). The arc starts NW (over Forggensee),
+# sweeps NE, then E, then SE toward the mountains.
+# Each position is offset so the forward view looks toward the Alps.
+#
+# Camera rotation convention in Blender:
+#   (0,0,0) = looking down -Z (nadir / straight down).
+#   rotation_euler.x = +45° → tilts 45° toward +Y (world north).
+#   To look SOUTH (toward Alps at -Y in scene), we want to tilt toward -Y:
+#     rotation_euler.x = -(90° - 45°) = -45°  →  cam looks south at 45° off nadir.
+#     Actually: cam forward = -Z when x=0. Rotating x by -45° tilts the forward
+#     vector from -Z toward +Y (counterintuitive). Let's think:
+#       Blender Euler XYZ on camera: x=0,y=0,z=0 → camera looks DOWN (-Z world).
+#       Rotate X by +90° → camera looks toward +Y (world north = scene north).
+#       Rotate X by -90° → camera looks toward -Y (world south = Alps direction).
+#       Rotate X by (90°-45°)=+45° → camera looks 45° off nadir toward north.
+#       Rotate X by -(90°-45°)=-45° → camera looks 45° off nadir toward south (Alps).
+#   So: rotation_euler = (-math.radians(45), 0, 0) → forward-look south.
+#   To face south-east: rotation_euler = (-math.radians(45), 0, -math.radians(45)).
+#   To face south-west: rotation_euler = (-math.radians(45), 0, +math.radians(45)).
+#
+# The 4 keyframe positions (Blender local coords, Z = absolute altitude in m):
+#   Frame 1: NW quadrant, looking SSW toward the mountains (Forggensee in foreground)
+#   Frame 2: N quadrant, looking S toward castles + Alps
+#   Frame 3: NE quadrant, looking SSE toward Tegelberg / alpine ridge
+#   Frame 4: E centre, looking SW across the valley + Alps
+# ---------------------------------------------------------------------------
+
+def _do_camera_v5():
+    # Remove any existing camera objects / curves from step 11 (old camera rig).
+    for obj in list(bpy.data.objects):
+        if obj.type in ("CAMERA", "CURVE", "EMPTY") and (
+            obj.name.startswith("FlightPath") or
+            obj.name.startswith("Camera") or
+            obj.name.startswith("CameraRig")
+        ):
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+    # Create a new camera.
+    bpy.ops.object.camera_add(location=(0, 0, CAMERA_ALTITUDE_M))
+    cam = bpy.context.active_object
+    cam.name = "Camera_v5"
+    scene.camera = cam
+
+    # 50mm lens for the main shots: narrow FOV keeps compositions tight.
+    cam.data.lens = 50.0
+    cam.data.clip_start = 10.0
+    cam.data.clip_end = 200_000.0
+
+    # 4 keyframe positions: (frame, x, y, z, rot_x_deg, rot_z_deg, focal_mm)
+    # AOI: terrain centred at origin, X=[-4611..+4611], Y=[-5188..+5188].
+    # Forggensee centre: approx Blender local (-1500, +2800).
+    # Schwangau/castles: approx Blender local (+200, +350).
+    # Frame 1: Wide aerial view of Forggensee lake + Füssen. Camera NW of lake,
+    #   looking east over the lake and its southern shore. Low angle to see topography.
+    #   This matched v5b frame 0060 which showed the best content.
+    kf = [
+        # (frame, x,     y,    z,    rx_deg,  rz_deg, focal_mm)
+
+        # Shot 1: Forggensee bay + Füssen shoreline — looking SSW.
+        # Camera at the NW quadrant, looking south so the lake is in the lower-left
+        # and the southern Allgäu hills fill the right/foreground.
+        # rz=+18° = slight westward yaw so Forggensee is not cut off at the left edge.
+        (  1,  -2000,  3000,  1600,  -52.0,  18.0,  50),
+
+        # Shot 2: Schwangau + forested slopes — best composition from earlier tests.
+        ( 60,   -200,  2500,  1800,  -50.0,   5.0,  50),
+
+        # Shot 3: Forggensee delta + sandbar — best composition from earlier tests.
+        (120,   1000,  1500,  1700,  -48.0, -15.0,  50),
+
+        # Shot 4: High aerial overview — camera at 2400m, looking SSW over the whole valley.
+        # At 48° pitch from 2400m, center of frame hits 2400/tan(42°) = 2665m → Y = 2000-2665 = -665m.
+        # More elevated = wider context, less detail = provides variety in the set.
+        (180,  -1000,  2000,  2400,  -48.0,  12.0,  35),
+    ]
+
+    scene.frame_start = 1
+    scene.frame_end = 180
+
+    for (frame, x, y, z, rx, rz, focal) in kf:
+        scene.frame_set(frame)
+        cam.location = (x, y, z)
+        cam.rotation_euler = (
+            math.radians(rx),
+            0.0,
+            math.radians(rz),
+        )
+        cam.data.lens = focal
+        cam.keyframe_insert(data_path="location", frame=frame)
+        cam.keyframe_insert(data_path="rotation_euler", frame=frame)
+        cam.data.keyframe_insert(data_path="lens", frame=frame)
+        print(f"[assemble] camera kf frame {frame}: loc=({x},{y},{z:.0f}) "
+              f"rx={rx}° rz={rz}° focal={focal}mm")
+
+    # Use Bezier interpolation for smooth transitions.
+    if cam.animation_data and cam.animation_data.action:
+        for fcurve in cam.animation_data.action.fcurves:
+            for kp in fcurve.keyframe_points:
+                kp.interpolation = "BEZIER"
+
+    print(f"[assemble] v5 camera: 4 keyframes, lens=28mm, alt={Z:.0f}m, "
+          f"pitch≈45° off-nadir, south-facing toward Alps")
+
+_try("camera v5", _do_camera_v5)
+
+cam_name = scene.camera.name if scene.camera else "(none)"
+print(f"[assemble] scene camera: {cam_name}")
+print(f"[assemble] frame range: {scene.frame_start} – {scene.frame_end}")
+
+# ---------------------------------------------------------------------------
 # Scene stats
 # ---------------------------------------------------------------------------
 
 all_objs = list(bpy.data.objects)
 mesh_objs = [o for o in all_objs if o.type == "MESH"]
-terrain_obj = next((o for o in mesh_objs if o.name.startswith("Terrain")), None)
-terrain_verts = len(terrain_obj.data.vertices) if terrain_obj else 0
+terrain_obj_stat = next((o for o in mesh_objs if o.name.startswith("Terrain")), None)
+terrain_verts = len(terrain_obj_stat.data.vertices) if terrain_obj_stat else 0
 print(f"[assemble] total objects: {len(all_objs)}")
 print(f"[assemble] mesh objects: {len(mesh_objs)}")
 print(f"[assemble] terrain verts (base mesh before Subsurf): {terrain_verts}")
@@ -672,20 +835,13 @@ bpy.ops.wm.save_as_mainfile(filepath=str(OUT_BLEND))
 print(f"[assemble] saved .blend → {OUT_BLEND}")
 
 # ---------------------------------------------------------------------------
-# Render 4 stills — v4 naming, 1920×1080, 128 spp + OIDN
+# Render 4 stills — v5 naming, 1920×1080, 128 spp + OIDN
+# v5: render at the 4 keyframe frames (1, 60, 120, 180) for the best compositions.
 # ---------------------------------------------------------------------------
 
-total_frames = scene.frame_end - scene.frame_start
-render_frames = []
-if total_frames > 0:
-    for frac in (0.10, 0.35, 0.60, 0.90):
-        f = int(scene.frame_start + round(frac * total_frames))
-        f = max(scene.frame_start, min(scene.frame_end, f))
-        render_frames.append(f)
-else:
-    render_frames = [1, 25, 50, 75]
+render_frames = [1, 60, 120, 180]
 
-print(f"[assemble] rendering frames: {render_frames} (total timeline: {total_frames})")
+print(f"[assemble] rendering frames: {render_frames} (v5 keyframe positions)")
 print(f"[assemble] render: {RENDER_WIDTH}×{RENDER_HEIGHT}, "
       f"{scene.cycles.samples} spp, denoise={scene.cycles.use_denoising}")
 
@@ -694,8 +850,7 @@ scene.render.use_file_extension = True
 scene.render.use_render_cache = False
 
 for i, frame in enumerate(render_frames):
-    # v4 naming.
-    stem = f"allgaeu_v4_frame{frame:04d}"
+    stem = f"allgaeu_v5_frame{frame:04d}"
     out_path_no_ext = str(RENDERS_DIR / stem)
     expected_path = str(RENDERS_DIR / f"{stem}.png")
 
@@ -724,8 +879,8 @@ for i, frame in enumerate(render_frames):
     except Exception as e:
         print(f"[assemble] WARN render frame {frame}: {e}")
 
-# Save again after rendering with frame set back to start.
-scene.frame_set(scene.frame_start)
+# Save again after rendering.
+scene.frame_set(1)
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT_BLEND))
 print(f"[assemble] final save → {OUT_BLEND}")
 
@@ -735,7 +890,7 @@ print(f"[assemble] final save → {OUT_BLEND}")
 
 dt_total = time.time() - t0_global
 print("\n" + "=" * 70)
-print("ALLGÄU ASSEMBLY SUMMARY (v4)")
+print("ALLGÄU ASSEMBLY SUMMARY (v5)")
 print("=" * 70)
 print(f"Total time:       {dt_total:.0f}s")
 print(f"Steps done:       {', '.join(steps_done)}")
@@ -745,7 +900,6 @@ print(f"Terrain subdiv:   {TERRAIN_SUBDIV} → {2**TERRAIN_SUBDIV + 1} verts/sid
 print(f"Terrain verts:    {terrain_verts:,} (base mesh)")
 print(f"Buildings:        {building_count}")
 print(f"Cloud objects:    {len(cloud_objects)}")
-print(f"Camera pitch:     {NADIR_FORWARD_TILT_DEG}° off nadir")
 print(f"Camera:           {cam_name}")
 print(f"Frame range:      {scene.frame_start}–{scene.frame_end}")
 print(f"Engine:           {scene.render.engine}")

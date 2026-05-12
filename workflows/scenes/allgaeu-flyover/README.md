@@ -3,10 +3,14 @@
 Self-contained cinematic scene for the ~45 km² Allgäu polygon around Forggensee /
 Schwangau / Füssen (the Schwangau castles, pre-alpine lakes and forest).
 
-> **Status:** v4 cinematic look pass complete. `scene.blend` (258 MB, packed) is in this folder
+> **Status:** v5 look pass complete. `scene.blend` (259 MB, packed) is in this folder
 > but **not tracked in git** (>100 MB). See `MANIFEST.md` for regeneration instructions.
 > This folder is meant to be liftable on its own; `MANIFEST.md` lists every commit/file
 > added across the repo for this scene + the Blender-tool changes it depends on.
+>
+> v5 fixes from v4: **exposure corrected** (no more white-wash), **3D trees hidden** (no noise
+> specks — forest reads via DOP ortho + forest overlay), **hand-placed camera keyframes** 
+> (1600–2400m, 48–52° off nadir), **clouds** at 2100m base. 4 frames at 85–100s each (RTX 4070).
 
 ## Contents (when complete)
 

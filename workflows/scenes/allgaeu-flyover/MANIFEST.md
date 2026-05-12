@@ -61,22 +61,41 @@ tree textures + building materials + heightmap). Size: ~258 MB.
 
 ## v4 cinematic look pass
 
-Changes vs v3 (see `workflows/_assemble_allgaeu.py`):
-- **Ortho UDIM fix**: `bpy.data.images.load()` with `<UDIM>` token path instead of
-  loading tile 1001 + patching source; `buildings_textured.py` reuses same image.
-- **Ground shader removed from terrain**: was overwriting OrthoDrape material with
-  DOPProjector flat-projection that only sampled UDIM tile 1001 → grey ground.
-- **Camera pitch**: 50° off nadir (was 22°); bank roll +5°; `use_curve_follow=False`.
-- **Sky**: afternoon, sun 40° el / 225° az, energy 5.0 W, warm color, World strength 1.0.
-- **Clouds**: base lowered to 1700 m (camera at ~2485 m → above clouds), coverage 0.40.
-- **GPU rendering**: OptiX RTX 4070 (128 spp + OIDN); ~90 s/frame vs CPU minutes/frame.
-- **Resolution**: 1920×1080 (was 960×540).
+Changes vs v3 (see git history):
+- Ortho UDIM fix, ground shader skip, camera pitch 50° off nadir, afternoon sky 5W sun, GPU rendering, 1920×1080.
+
+## v5 cinematic look pass
+
+Changes vs v4 (`workflows/_assemble_allgaeu.py`):
+
+- **Exposure fixed**: sun energy 2.0 W (was 5.0), World Background Strength 0.15 (was 1.0),
+  view exposure -1.5 EV (was +0.3), AgX "Medium High Contrast" look. DOP ortho now reads as
+  a real aerial photo — visible greens, browns, teal water — not a white wash.
+- **Trees hidden from render** (`show_render=False` on TreeScatter GN modifier): at 1600–2400 m
+  AGL, decimated 3D trees render as dark noise specks. Forest reads via the DOP ortho + forest overlay.
+- **Forest overlay on OrthoDrape material**: loads `forest_mask.tif` (Non-Color), darkens forest
+  pixels by −32% (forests absorb more light) and adds a noise-bump perturbation (scale ~120 UV units)
+  so canopy reads as textured mass rather than flat photo. GN trees still in the .blend for close-up use.
+- **Camera**: 4 hand-placed keyframes (no FOLLOW_PATH), multi-altitude (1600–2400 m absolute),
+  50mm lens, aimed toward the lake/valleys/southern foothills. Avoids the near-nadir look
+  and the fly-path-edge problems of v4.
+- **Clouds**: base 2100 m, thickness 400 m, coverage 0.40, cirrus at 6000 m.
+- **UDIM seams**: less prominent at correct exposure. Not post-processed further.
+- Render time: ~85–100 s/frame on RTX 4070 OptiX. 4 frames = ~380 s total.
+- `scene.blend` packed: 259.4 MB (not in git).
+
+**Notes on "cinematic" limitations**: The Allgäu AOI is 10 km × 9 km. With a planar terrain mesh,
+any forward-looking composition aimed past the terrain boundary shows the mesh edge + black void.
+The v5 frames are aerial-photography style (near-oblique, 48–52° off nadir), not "mountains on
+horizon + sky" cinematic. Getting a true horizon shot would require extending the terrain to ≥30 km,
+or adding a distant mountain backdrop mesh. This is noted as a future improvement.
 
 ## How this scene was assembled
 
 `blender --background --python workflows/_assemble_allgaeu.py` → imports heightmap_clean.tif,
-DOP40 UDIM ortho (110 tiles via `<UDIM>` token), 7979 LoD2 buildings, forest-masked GN trees,
-volumetric cumulus deck (1700m base), Nishita afternoon sky, FOLLOW_PATH camera rig on 40-pt
-path at ~2485m AGL, saves `data/scene_allgaeu-forggensee.blend`, renders 4 stills at 10/35/60/90%.
-Final deliverable: `bpy.ops.file.pack_all()` → `scene.blend` (258 MB, not in git).
+DOP40 UDIM ortho (110 tiles via `<UDIM>` token), 7979 LoD2 buildings, forest-masked GN trees
+(render-hidden for flyover), forest overlay on terrain material, volumetric cumulus deck (2100m base),
+Nishita sky (sun 50° el / 150° az, energy 2.0 W, World strength 0.15), 4 keyframe camera positions
+at 1600–2400m absolute, saves `data/scene_allgaeu-forggensee.blend`, renders 4 stills.
+Final deliverable: `bpy.ops.file.pack_all()` → `scene.blend` (259 MB, not in git).
 </content>
