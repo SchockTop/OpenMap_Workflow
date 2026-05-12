@@ -11,21 +11,26 @@ preview at 9 km aerial scale).
 
 Outputs:
     data/scene_allgaeu-forggensee.blend
-    workflows/scenes/allgaeu-flyover/renders/allgaeu_v5_frame{NNNN}.png
-    (4 frames: hand-placed cinematic positions, forward-look toward the Alps)
+    workflows/scenes/allgaeu-flyover/renders/allgaeu_v6_frame{NNNN}.png
+    (4 frames: hand-placed cinematic positions, forward-look toward the distant
+     ridge backdrop; sky + ridge horizon + broken cumulus in frame)
 
-v5 changes vs v4:
-  1. Exposure fixed: sun energy 2.0 W, World strength 0.15, exposure -1.5 EV,
-     AgX "Medium High Contrast" look — ortho must read as a real aerial photo.
-  2. Trees hidden from render (GN modifier show_render=False); forest reads via
-     the ortho DOP photo + a forest-overlay on the OrthoDrape material (darken +
-     noise bump on forest pixels so hillsides read as canopy mass, not flat photo).
-  3. Camera: 4 hand-placed keyframes on a south-facing arc at ~2200 m absolute,
-     pitched 45° off nadir. Foreground lakes/fields → midground forest →
-     Alps on the southern horizon → sky in top 25%.
-  4. Clouds: base 2050 m, thickness 400 m, coverage 0.40 so the camera (~2200 m)
-     skims through a broken cumulus deck; ≥2 frames show clouds in mid-distance.
-  5. UDIM seams: less prominent at correct exposure; no further processing needed.
+v6 changes vs v5:
+  1. Cinematic camera framing: cameras placed at 1300–2200 m absolute, pitched
+     ~22–35° below horizontal looking south. The AOI terrain only reaches 1685 m
+     (no in-AOI peaks) — so a *backdrop ridge mesh* is added ~10 km south of the
+     AOI, peaks ~2400–3200 m, hazy blue-grey, atmospheric-faded — it reads as the
+     distant Alps on the horizon. Foreground terrain → midground rising terrain →
+     backdrop ridge as the horizon line → broken cumulus → sky in the top ~25–30%.
+  2. World Background Strength raised to 0.30 (was 0.15). At -1.5 EV exposure the
+     Nishita sky is now clearly visible above the horizon without blowing the ground.
+  3. Aerial haze domain volume added (light density) so distance fades and the
+     backdrop ridge reads as far away.
+  4. Cloud deck at 2400 m base (well above the 1685 m terrain), broken coverage,
+     huge XY extent → cumulus visible in the upper sky band in most frames; the
+     cameras (1300–2200 m) sit below the deck. Cirrus at 6500 m.
+  5. All v5 goodness kept: exposure (sun 2 W, -1.5 EV, AgX Med-High Contrast),
+     natural ortho colours, forest overlay on terrain, ortho-textured building roofs.
 """
 from __future__ import annotations
 
@@ -308,14 +313,15 @@ def _do_sky():
             print(f"[assemble] Sun v5: energy=2.0 W, az=150°, el=50°")
             break
 
-    # World Background Strength: v5 = 0.15 (was 1.0 → blown sky and GI bounce blowout).
-    # A strength of 0.15 gives a well-lit but not overexposed scene in Cycles Nishita.
+    # World Background Strength: v6 = 0.30 (was 0.15 in v5 → sky barely visible).
+    # At -1.5 EV view exposure 0.30 makes the Nishita sky read as a proper afternoon
+    # blue above the horizon without blowing out the ortho-textured ground.
     world = scene.world
     if world and world.use_nodes:
         for node in world.node_tree.nodes:
             if node.type == "BACKGROUND":
-                node.inputs["Strength"].default_value = 0.15
-                print(f"[assemble] World Background Strength = 0.15 (v5 fix)")
+                node.inputs["Strength"].default_value = 0.30
+                print(f"[assemble] World Background Strength = 0.30 (v6: sky visible)")
 
     # AgX with "Medium High Contrast" look for punchier midtones.
     scene.view_settings.view_transform = "AgX"
@@ -331,7 +337,7 @@ def _do_sky():
     # v5: exposure = -1.5 EV (was +0.3 in v4 → additional 1.5 stop blowout).
     scene.view_settings.exposure = -1.5
     scene.view_settings.gamma = 1.0
-    print(f"[assemble] view exposure = -1.5 EV (v5)")
+    print(f"[assemble] view exposure = -1.5 EV (v6)")
 
 _try("sky preset", _do_sky)
 
@@ -606,30 +612,198 @@ def _do_forest_overlay():
 _try("forest overlay", _do_forest_overlay)
 
 # ---------------------------------------------------------------------------
-# 10. Clouds — v5: base 2050 m so camera at ~2200 m skims through broken deck.
-#     Coverage 0.40, thickness 400 m (top at ~2450 m) → camera is inside/just
-#     above the layer. At least 2 of the 4 frames should show cumulus in mid-distance.
-#     Cirrus enabled at 6000 m for sky interest.
+# 10a. Backdrop ridge — the AOI terrain only reaches 1685 m, so there is no
+#      in-AOI mountain wall. We add a long procedural ridge mesh ~10 km south of
+#      the AOI (beyond the terrain edge), peaks ~2400–3200 m, with a flat hazy
+#      blue-grey material. Combined with the aerial haze it reads as the distant
+#      Alps on the horizon and stops the camera from seeing into the void when it
+#      looks past the terrain edge.
+# ---------------------------------------------------------------------------
+
+backdrop_obj_name = ""
+
+
+def _do_backdrop_ridge():
+    global backdrop_obj_name
+    bbox = scene.get("bbox_utm32n")
+    anchor = scene.get("utm32n_anchor")
+    if not bbox or not anchor:
+        raise RuntimeError("bbox/anchor not set — cannot place backdrop ridge")
+    # Scene-local AOI extents (terrain is centred at origin).
+    size_x = float(bbox[2] - bbox[0])
+    size_y = float(bbox[3] - bbox[1])
+    half_x = size_x / 2.0
+    half_y = size_y / 2.0
+    # South edge of the terrain is at local Y = -half_y.
+    south_edge_y = -half_y
+
+    existing = bpy.data.objects.get("BackdropRidge")
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
+
+    # Grid plane: wide in X (4× AOI), modest in Y, placed FAR south of the AOI edge
+    # so it reads as a distant mountain range. The whole mesh uses a pure-emission
+    # uniform haze-blue material → no shading contrast, so only its jagged TOP EDGE
+    # silhouette is visible against the sky (exactly how distant mountains look in
+    # atmospheric haze). Base near valley-floor level so the floor blends with the
+    # haze-filled gap below it.
+    width_x = size_x * 4.0
+    depth_y = 2800.0                 # shallow → little floor area in frame
+    ridge_center_y = south_edge_y - 11000.0   # ~11 km beyond the AOI edge
+    bpy.ops.mesh.primitive_grid_add(
+        x_subdivisions=160, y_subdivisions=16, size=1.0,
+        location=(0.0, ridge_center_y, 0.0),
+    )
+    ridge = bpy.context.active_object
+    ridge.name = "BackdropRidge"
+    ridge.scale = (width_x, depth_y, 1.0)
+    bpy.ops.object.transform_apply(scale=True)
+
+    # Displace with two CLOUDS noise textures at different scales → a soft jagged
+    # alpine silhouette.
+    for old in ("BackdropRidgeNoise1", "BackdropRidgeNoise2"):
+        t = bpy.data.textures.get(old)
+        if t is not None:
+            bpy.data.textures.remove(t)
+    tex1 = bpy.data.textures.new("BackdropRidgeNoise1", type="CLOUDS")
+    tex1.noise_scale = 0.45          # large, gentle masses
+    tex1.noise_depth = 3
+    tex2 = bpy.data.textures.new("BackdropRidgeNoise2", type="CLOUDS")
+    tex2.noise_scale = 0.13          # mid-scale undulation
+    tex2.noise_depth = 1
+
+    m1 = ridge.modifiers.new("RidgeDisp1", type="DISPLACE")
+    m1.texture = tex1
+    m1.strength = 2300.0
+    m1.mid_level = 0.0
+    m1.direction = "Z"
+    m1.texture_coords = "OBJECT"
+
+    m2 = ridge.modifiers.new("RidgeDisp2", type="DISPLACE")
+    m2.texture = tex2
+    m2.strength = 650.0
+    m2.mid_level = 0.5
+    m2.direction = "Z"
+    m2.texture_coords = "OBJECT"
+
+    # Base near valley-floor level.
+    ridge.location.z = 600.0
+
+    sub = ridge.modifiers.new("RidgeSubsurf", type="SUBSURF")
+    sub.levels = 1
+    sub.render_levels = 2
+
+    # Pure-emission haze-blue material — no shading, so the mesh renders as a flat
+    # pale silhouette. Slight downward gradient (lighter toward the base) would be
+    # ideal but a single flat colour reads fine through the haze.
+    mat = bpy.data.materials.get("BackdropRidge_Haze")
+    if mat is not None:
+        bpy.data.materials.remove(mat)
+    mat = bpy.data.materials.new("BackdropRidge_Haze")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    out.location = (300, 0)
+    emis = nt.nodes.new("ShaderNodeEmission")
+    emis.location = (0, 0)
+    emis.inputs["Color"].default_value = (0.60, 0.68, 0.80, 1.0)   # pale haze-blue
+    emis.inputs["Strength"].default_value = 1.7
+    nt.links.new(emis.outputs[0], out.inputs["Surface"])
+    ridge.data.materials.append(mat)
+
+    for poly in ridge.data.polygons:
+        poly.use_smooth = True
+
+    backdrop_obj_name = ridge.name
+    print(f"[assemble] backdrop ridge: '{ridge.name}' centred at Y={ridge_center_y:.0f} "
+          f"(~11 km S of AOI edge), base Z=600 m, peaks ~2300-2900 m, pure-emission haze-blue")
+
+_try("backdrop ridge", _do_backdrop_ridge)
+
+# ---------------------------------------------------------------------------
+# 10b. Aerial haze — light volume scatter domain so distance fades and the
+#      backdrop ridge reads as far away. Also softens the UDIM ortho seams.
+# ---------------------------------------------------------------------------
+
+def _do_haze():
+    world_mod = importlib.import_module(
+        "bl_ext.user_default.blender_tools.world_setup")
+    bbox = scene.get("bbox_utm32n")
+    if not bbox:
+        raise RuntimeError("bbox not set — cannot size haze domain")
+    size_x = float(bbox[2] - bbox[0])
+    size_y = float(bbox[3] - bbox[1])
+    # bbox_meters expects (x, y, z); use a generous Z for the haze column.
+    # padding_fraction inflates ALL axes by (1+pf). X/Y big enough to reach the ridge
+    # (~13.9 km south of centre); Z kept modest (~250-2200 m, a thin low haze layer)
+    # so the upper sky stays clear AND the volume cost is small. Density kept very
+    # light — just enough atmospheric depth-cue without milking the picture.
+    pf = 2.0   # X/Y coverage = ±(half_extent × 3.0); for size_y=10376 → ±15564 m → reaches the ridge near edge
+    haze = world_mod.add_domain_cube_volume(
+        bbox_meters=(size_x, size_y, 1950.0 / (1.0 + pf)),
+        density=2.5e-6,            # faint — ~2% over 9 km foreground, ~7% over ~26 km
+        anisotropy=0.4,
+        color_rgb=(0.60, 0.72, 0.87),
+        object_name="AerialHaze",
+        padding_fraction=pf,
+    )
+    # Centre the (now ~1950 m tall) haze slab at ~1225 m → covers ~250-2200 m.
+    haze.location.z = 1225.0
+    print(f"[assemble] aerial haze domain added: density 2.5e-6 (faint, low-level), AOI + backdrop")
+
+_try("aerial haze", _do_haze)
+
+# ---------------------------------------------------------------------------
+# 10c. Clouds — v6: deck base 2400 m (well above the 1685 m AOI terrain), huge XY
+#      extent so cumulus fills the upper sky band; broken coverage so landscape is
+#      still visible; cameras (1300–2200 m) sit below the deck. Cirrus at 6500 m.
 # ---------------------------------------------------------------------------
 
 def _do_clouds():
     result = bpy.ops.blender_tools.add_clouds(
         "EXEC_DEFAULT",
-        coverage=0.40,
-        # v5e: multi-altitude camera setup (1600-2800m). Cloud deck 2100-2500m.
-        # Frames 1-3 at 1600-1800m are BELOW clouds (cloud mass visible above).
-        # Frame 4 at 2800m is ABOVE clouds (puffy tops visible below toward valley).
-        # Coverage 0.40 = broken deck; the near-horizon frame (shot 4) should show
-        # cloud tops + sky above.
-        base_altitude_m=2100.0,
-        thickness_m=400.0,         # top at 2500m
-        density=0.05,
+        coverage=0.45,
+        base_altitude_m=2050.0,    # camera 1900-2400 m → at/just below the deck base
+        thickness_m=750.0,         # top at 2800 m
+        density=0.16,              # punchy so cumulus clearly reads against the sky
         detail=0.5,
         cirrus=True,
-        cirrus_altitude_m=6000.0,
+        cirrus_altitude_m=6500.0,
     )
     if result != {"FINISHED"}:
         raise RuntimeError(f"add_clouds returned {result}")
+
+    # --- v6 fix: clouds.py wires the Noise textures to "Object" texcoords assuming
+    # the box mesh is 1×1×1, but _make_cloud_box applies the scale so the mesh is
+    # ~14 km wide → Object coords are ±7000 → noise Scale 2.5 → ~17500 cycles =
+    # incoherent per-voxel noise = no visible cloud blobs. We rescale the Noise
+    # `Scale` inputs by 1/(mesh half-extent) so the original "N blobs across the box"
+    # intent is restored.  Do this BEFORE enlarging the box.
+    cum = bpy.data.objects.get("Clouds_Cumulus")
+    if cum is not None:
+        dims = cum.dimensions
+        half_extent = max(dims.x, dims.y) / 2.0  # ~7000 m
+        mat = next((m for m in cum.data.materials if m and "Cumulus" in m.name), None)
+        if mat and mat.use_nodes:
+            for node in mat.node_tree.nodes:
+                if node.type == "TEX_NOISE":
+                    try:
+                        node.inputs["Scale"].default_value = (
+                            node.inputs["Scale"].default_value / half_extent
+                        )
+                    except Exception:
+                        pass
+            print(f"[assemble] cumulus noise Scale rescaled by 1/{half_extent:.0f} "
+                  "(clouds.py Object-coord bug workaround)")
+
+    # Enlarge the cloud decks so they span the whole view incl. the backdrop ridge.
+    # (Object-space noise is now relative to the mesh extent, so enlarging the box
+    # would shrink the apparent blob count — instead we enlarge MUCH more modestly.)
+    for nm in ("Clouds_Cumulus", "Clouds_Cirrus"):
+        obj = bpy.data.objects.get(nm)
+        if obj is not None:
+            obj.scale = (obj.scale.x * 1.6, obj.scale.y * 1.6, obj.scale.z)
 
 _try("clouds", _do_clouds)
 
@@ -686,53 +860,27 @@ def _verify_ortho_udim():
 _try("ortho UDIM path fix", _verify_ortho_udim)
 
 # ---------------------------------------------------------------------------
-# 12. v5 Camera — 4 hand-placed keyframes for a genuine cinematic composition.
+# 12. v6 Camera — 4 hand-placed keyframes, cinematic south-facing framing.
 #
-# Goal: foreground landscape (Forggensee / fields / Schwangau) in the lower
-# 2/3rds; the Alps (Säuling ~2047 m, Tegelberg ~1720 m) visible on the southern
-# horizon; sky in the top 25%; broken cumulus visible mid-distance.
+# Each keyframe is (camera position, look-at target, focal, bank) — far more
+# robust than guessing Euler angles. Rotation is computed via to_track_quat so
+# the camera's -Z points at the target and +Y points up (then we add a bank roll).
 #
-# AOI (EPSG:25832): SW=(628971, 5268342), NE=(638194, 5278717). Centre ~(633583, 5273530).
-# Terrain is centred at Blender origin. So in Blender-local coords:
-#   Scene centre = (0, 0).
-#   South edge (Alps) ≈ Y = −5188 m from centre (the low-latitude / small-Y end).
-#   North edge (Forggensee north shore) ≈ Y = +5188 m.
-#   East edge ≈ X = +4606 m.
-#   West edge ≈ X = −4606 m.
-# Forggensee is roughly in the north-western quadrant.
-# The castles (Neuschwanstein / Hohenschwangau) are at the eastern-central area
-# (Schwangau, ~633700 E, 5273700 N → Blender local ≈ +117, +170).
+# AOI: terrain centred at Blender origin. X[-4612,4612], Y[-5188,5188], Z[762,1685].
+#   Forggensee centre ≈ (-1500, +2800, ~780). Schwangau/castles ≈ (+200, +350, ~830).
+#   AOI south edge at Y = -5188. The backdrop ridge sits centred at Y ≈ -16200,
+#   base Z ~550 m, peaks ~2400-2700 m → the distant "Alps on the horizon" in the south.
 #
-# Strategy: 4 camera positions along a south-facing arc, each at 2200 m absolute Z.
-# Camera pitched 45° forward (off nadir). The arc starts NW (over Forggensee),
-# sweeps NE, then E, then SE toward the mountains.
-# Each position is offset so the forward view looks toward the Alps.
-#
-# Camera rotation convention in Blender:
-#   (0,0,0) = looking down -Z (nadir / straight down).
-#   rotation_euler.x = +45° → tilts 45° toward +Y (world north).
-#   To look SOUTH (toward Alps at -Y in scene), we want to tilt toward -Y:
-#     rotation_euler.x = -(90° - 45°) = -45°  →  cam looks south at 45° off nadir.
-#     Actually: cam forward = -Z when x=0. Rotating x by -45° tilts the forward
-#     vector from -Z toward +Y (counterintuitive). Let's think:
-#       Blender Euler XYZ on camera: x=0,y=0,z=0 → camera looks DOWN (-Z world).
-#       Rotate X by +90° → camera looks toward +Y (world north = scene north).
-#       Rotate X by -90° → camera looks toward -Y (world south = Alps direction).
-#       Rotate X by (90°-45°)=+45° → camera looks 45° off nadir toward north.
-#       Rotate X by -(90°-45°)=-45° → camera looks 45° off nadir toward south (Alps).
-#   So: rotation_euler = (-math.radians(45), 0, 0) → forward-look south.
-#   To face south-east: rotation_euler = (-math.radians(45), 0, -math.radians(45)).
-#   To face south-west: rotation_euler = (-math.radians(45), 0, +math.radians(45)).
-#
-# The 4 keyframe positions (Blender local coords, Z = absolute altitude in m):
-#   Frame 1: NW quadrant, looking SSW toward the mountains (Forggensee in foreground)
-#   Frame 2: N quadrant, looking S toward castles + Alps
-#   Frame 3: NE quadrant, looking SSE toward Tegelberg / alpine ridge
-#   Frame 4: E centre, looking SW across the valley + Alps
+# Composition: cameras at 1900-2400 m (above the 1685 m AOI top), aimed at the AOI
+# terrain midground (Y -2800..-3400, Z 1100..1500) so the downward pitch is ~12-22°.
+# Frame reads: foreground lake/meadows → midground forested hills → distant ridge on
+# the horizon → broken cumulus → Nishita sky in the top ~25-35%.
 # ---------------------------------------------------------------------------
 
-def _do_camera_v5():
-    # Remove any existing camera objects / curves from step 11 (old camera rig).
+def _do_camera_v6():
+    import mathutils
+
+    # Remove any existing camera objects / curves.
     for obj in list(bpy.data.objects):
         if obj.type in ("CAMERA", "CURVE", "EMPTY") and (
             obj.name.startswith("FlightPath") or
@@ -741,73 +889,90 @@ def _do_camera_v5():
         ):
             bpy.data.objects.remove(obj, do_unlink=True)
 
-    # Create a new camera.
     bpy.ops.object.camera_add(location=(0, 0, CAMERA_ALTITUDE_M))
     cam = bpy.context.active_object
-    cam.name = "Camera_v5"
+    cam.name = "Camera_v6"
     scene.camera = cam
-
-    # 50mm lens for the main shots: narrow FOV keeps compositions tight.
-    cam.data.lens = 50.0
-    cam.data.clip_start = 10.0
+    cam.data.clip_start = 5.0
     cam.data.clip_end = 200_000.0
 
-    # 4 keyframe positions: (frame, x, y, z, rot_x_deg, rot_z_deg, focal_mm)
-    # AOI: terrain centred at origin, X=[-4611..+4611], Y=[-5188..+5188].
-    # Forggensee centre: approx Blender local (-1500, +2800).
-    # Schwangau/castles: approx Blender local (+200, +350).
-    # Frame 1: Wide aerial view of Forggensee lake + Füssen. Camera NW of lake,
-    #   looking east over the lake and its southern shore. Low angle to see topography.
-    #   This matched v5b frame 0060 which showed the best content.
+    # Strategy: cameras sit at 1900-2400 m (above the AOI terrain top of 1685 m), so
+    # the AOI terrain — its high forested ground around Y -1000..-4000 — is the
+    # midground subject, with the distant backdrop ridge (peaks ~2400 m, ~16 km S)
+    # on the horizon behind it, broken cumulus above (deck 2200-2800 m), and Nishita
+    # sky filling the top ~25-35%. We aim each target at the AOI terrain midground so
+    # the downward pitch lands ~12-25° — enough to show foreground + midground +
+    # horizon + sky in one frame.
+    #
+    # keyframes: (frame, cam_xyz, target_xyz, focal_mm, bank_deg)
     kf = [
-        # (frame, x,     y,    z,    rx_deg,  rz_deg, focal_mm)
+        # Shot A — over the NW Forggensee shore, looking S over the lake toward the
+        # forested hills + the distant ridge. Camera 2000 m (above the ~780 m lake);
+        # target on the AOI terrain SSW (the hill near Füssen / Tegelberg-side foothill).
+        # Wide 28mm for the lake→hills→mountains sweep, slight bank.
+        (  1,
+         (-2100.0,  3700.0, 2000.0),     # camera: NW quadrant
+         ( -700.0, -3200.0, 1100.0),     # target: AOI terrain, SSW
+         28.0, -4.0),
 
-        # Shot 1: Forggensee bay + Füssen shoreline — looking SSW.
-        # Camera at the NW quadrant, looking south so the lake is in the lower-left
-        # and the southern Allgäu hills fill the right/foreground.
-        # rz=+18° = slight westward yaw so Forggensee is not cut off at the left edge.
-        (  1,  -2000,  3000,  1600,  -52.0,  18.0,  50),
+        # Shot B — over Schwangau, looking S toward the forested ridge-line and the
+        # distant mountains beyond. Camera 1950 m; target on the high AOI ground due S.
+        # 35mm, level.
+        ( 60,
+         (  300.0,  2300.0, 1950.0),
+         (  300.0, -3000.0, 1500.0),
+         35.0, 0.0),
 
-        # Shot 2: Schwangau + forested slopes — best composition from earlier tests.
-        ( 60,   -200,  2500,  1800,  -50.0,   5.0,  50),
+        # Shot C — banking over the eastern forested ridge, looking SW across the
+        # valley toward the AOI's western forested high ground + the distant ridge.
+        # Camera 1900 m; target SW on the AOI terrain. 30mm wide, a stronger bank for
+        # a dynamic "flying" feel.
+        (120,
+         ( 2700.0,  1900.0, 1900.0),
+         (-2200.0, -2800.0, 1200.0),
+         30.0, -9.0),
 
-        # Shot 3: Forggensee delta + sandbar — best composition from earlier tests.
-        (120,   1000,  1500,  1700,  -48.0, -15.0,  50),
-
-        # Shot 4: High aerial overview — camera at 2400m, looking SSW over the whole valley.
-        # At 48° pitch from 2400m, center of frame hits 2400/tan(42°) = 2665m → Y = 2000-2665 = -665m.
-        # More elevated = wider context, less detail = provides variety in the set.
-        (180,  -1000,  2000,  2400,  -48.0,  12.0,  35),
+        # Shot D — high establishing, camera 2400 m near the N edge, looking S over
+        # the whole AOI (Forggensee → fields/forest → AOI hills → distant ridge → sky).
+        # 35mm. The "scale" shot.
+        (180,
+         (-1000.0,  4300.0, 2400.0),
+         ( -300.0, -3400.0, 1300.0),
+         35.0, 0.0),
     ]
 
     scene.frame_start = 1
     scene.frame_end = 180
 
-    for (frame, x, y, z, rx, rz, focal) in kf:
+    for (frame, cam_pos, target, focal, bank_deg) in kf:
         scene.frame_set(frame)
-        cam.location = (x, y, z)
-        cam.rotation_euler = (
-            math.radians(rx),
-            0.0,
-            math.radians(rz),
-        )
+        cam.location = mathutils.Vector(cam_pos)
+        # Direction from camera to target.
+        direction = mathutils.Vector(target) - mathutils.Vector(cam_pos)
+        # Camera's -Z looks at the target, +Y is up.
+        rot_quat = direction.to_track_quat('-Z', 'Y')
+        rot_euler = rot_quat.to_euler()
+        # Apply bank as a roll about the view axis (camera local Z).
+        if abs(bank_deg) > 1e-3:
+            roll = mathutils.Matrix.Rotation(math.radians(bank_deg), 4, 'Z')
+            m = rot_euler.to_matrix().to_4x4() @ roll
+            rot_euler = m.to_euler()
+        cam.rotation_euler = rot_euler
         cam.data.lens = focal
         cam.keyframe_insert(data_path="location", frame=frame)
         cam.keyframe_insert(data_path="rotation_euler", frame=frame)
         cam.data.keyframe_insert(data_path="lens", frame=frame)
-        print(f"[assemble] camera kf frame {frame}: loc=({x},{y},{z:.0f}) "
-              f"rx={rx}° rz={rz}° focal={focal}mm")
+        # Report the effective pitch.
+        d = direction.normalized()
+        pitch = math.degrees(math.asin(max(-1.0, min(1.0, d.z))))
+        print(f"[assemble] cam v6 kf {frame}: pos={tuple(round(c) for c in cam_pos)} "
+              f"target={tuple(round(t) for t in target)} pitch={pitch:.1f}° "
+              f"focal={focal}mm bank={bank_deg}°")
 
-    # Use Bezier interpolation for smooth transitions.
-    if cam.animation_data and cam.animation_data.action:
-        for fcurve in cam.animation_data.action.fcurves:
-            for kp in fcurve.keyframe_points:
-                kp.interpolation = "BEZIER"
+    print(f"[assemble] v6 camera: 4 look-at keyframes, cameras 1900–2400 m, "
+          f"aimed at the AOI midground (pitch ~12–22° down); ridge+clouds+sky in upper frame")
 
-    print(f"[assemble] v5 camera: 4 keyframes, lens=28mm, alt={Z:.0f}m, "
-          f"pitch≈45° off-nadir, south-facing toward Alps")
-
-_try("camera v5", _do_camera_v5)
+_try("camera v6", _do_camera_v6)
 
 cam_name = scene.camera.name if scene.camera else "(none)"
 print(f"[assemble] scene camera: {cam_name}")
@@ -835,13 +1000,13 @@ bpy.ops.wm.save_as_mainfile(filepath=str(OUT_BLEND))
 print(f"[assemble] saved .blend → {OUT_BLEND}")
 
 # ---------------------------------------------------------------------------
-# Render 4 stills — v5 naming, 1920×1080, 128 spp + OIDN
-# v5: render at the 4 keyframe frames (1, 60, 120, 180) for the best compositions.
+# Render 4 stills — v6 naming, 1920×1080, 128 spp + OIDN
+# v6: render at the 4 keyframe frames (1, 60, 120, 180) for the best compositions.
 # ---------------------------------------------------------------------------
 
 render_frames = [1, 60, 120, 180]
 
-print(f"[assemble] rendering frames: {render_frames} (v5 keyframe positions)")
+print(f"[assemble] rendering frames: {render_frames} (v6 keyframe positions)")
 print(f"[assemble] render: {RENDER_WIDTH}×{RENDER_HEIGHT}, "
       f"{scene.cycles.samples} spp, denoise={scene.cycles.use_denoising}")
 
@@ -850,7 +1015,7 @@ scene.render.use_file_extension = True
 scene.render.use_render_cache = False
 
 for i, frame in enumerate(render_frames):
-    stem = f"allgaeu_v5_frame{frame:04d}"
+    stem = f"allgaeu_v6_frame{frame:04d}"
     out_path_no_ext = str(RENDERS_DIR / stem)
     expected_path = str(RENDERS_DIR / f"{stem}.png")
 
@@ -890,7 +1055,7 @@ print(f"[assemble] final save → {OUT_BLEND}")
 
 dt_total = time.time() - t0_global
 print("\n" + "=" * 70)
-print("ALLGÄU ASSEMBLY SUMMARY (v5)")
+print("ALLGÄU ASSEMBLY SUMMARY (v6)")
 print("=" * 70)
 print(f"Total time:       {dt_total:.0f}s")
 print(f"Steps done:       {', '.join(steps_done)}")
