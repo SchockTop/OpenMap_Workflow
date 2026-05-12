@@ -11,7 +11,7 @@ preview at 9 km aerial scale).
 
 Outputs:
     data/scene_allgaeu-forggensee.blend
-    workflows/scenes/allgaeu-flyover/renders/allgaeu_v1_frame{NNNN}.png
+    workflows/scenes/allgaeu-flyover/renders/allgaeu_v3_frame{NNNN}.png
     (4 frames at ~10 %, 35 %, 60 %, 90 % of the camera path)
 """
 from __future__ import annotations
@@ -25,6 +25,13 @@ import time
 from pathlib import Path
 
 import bpy
+
+# Line-buffer stdout so `[assemble]` progress is visible while Blender runs
+# under `--background` with a piped stdout (otherwise prints only flush at exit).
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+except Exception:
+    pass
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -109,17 +116,44 @@ def _try(name: str, fn, *args, **kwargs):
 # ---------------------------------------------------------------------------
 
 def _do_terrain():
-    heightmap = DATA_PROCESSED / "heightmap.tif"
+    # Prefer the nodata-cleaned heightmap (if present). The operator would
+    # try to GDAL-mosaic all TIFs in the directory, which fails when there are
+    # multiple TIFs (heightmap.tif + heightmap_clean.tif). Bypass GDAL by
+    # calling geo_import.geotiff_metadata + terrain_setup.build_terrain_from_heightmap
+    # directly on the single pre-processed file.
+    heightmap = DATA_PROCESSED / "heightmap_clean.tif"
     if not heightmap.is_file():
-        raise FileNotFoundError(f"heightmap.tif not found: {heightmap}")
-    result = bpy.ops.blender_tools.import_heightmap(
-        "EXEC_DEFAULT",
-        filepath=str(heightmap),
+        heightmap = DATA_PROCESSED / "heightmap.tif"
+        print("[assemble] WARN: heightmap_clean.tif missing, using heightmap.tif")
+    if not heightmap.is_file():
+        raise FileNotFoundError(f"heightmap not found: {heightmap}")
+    print(f"[assemble] heightmap: {heightmap.name}")
+
+    geo_import_mod = importlib.import_module(
+        "bl_ext.user_default.blender_tools.geo_import")
+    terrain_setup_mod = importlib.import_module(
+        "bl_ext.user_default.blender_tools.terrain_setup")
+
+    meta = geo_import_mod.geotiff_metadata(heightmap)
+    size_x = meta["size_meters_x"]
+    size_y = meta["size_meters_y"]
+    # Anchor: SW corner in UTM32N. Z = 0 (elevations in the heightmap are real
+    # metres above sea-level; we only shift XY to avoid float32 precision loss).
+    anchor = (meta["origin_x"], meta["origin_y"] - size_y, 0.0)
+    scene["utm32n_anchor"] = list(anchor)
+    scene["bbox_utm32n"] = [anchor[0], anchor[1],
+                            anchor[0] + size_x, anchor[1] + size_y]
+
+    terrain_obj = terrain_setup_mod.build_terrain_from_heightmap(
+        str(heightmap),
+        size_meters=(size_x, size_y),
         subdivisions=TERRAIN_SUBDIV,
         strength=1.0,
+        anchor_utm32n=anchor,
     )
-    if result != {"FINISHED"}:
-        raise RuntimeError(f"import_heightmap returned {result}")
+    scene["terrain_object_name"] = terrain_obj.name
+    print(f"[assemble] terrain built: {terrain_obj.name} "
+          f"({size_x:.0f}×{size_y:.0f} m, anchor {anchor[0]:.0f},{anchor[1]:.0f})")
 
 _try("terrain", _do_terrain)
 
@@ -212,13 +246,48 @@ def _do_cinematic():
 _try("cinematic preset (Sun + World)", _do_cinematic)
 
 # ---------------------------------------------------------------------------
-# 6. Sky preset — afternoon (warm, southwesterly, cinematic default)
+# 6. Sky preset + World background sky for Cycles.
+#    apply_sky_preset only tweaks the Sun light + any TEX_SKY node already in
+#    the World; it does NOT create the world sky node tree. For Cycles we must
+#    explicitly call world_setup.setup_multiple_scattering_sky() to get a
+#    physical sky background — without it the scene renders nearly black.
 # ---------------------------------------------------------------------------
 
 def _do_sky():
+    # Explicit physical sky background (Cycles needs a world node tree —
+    # cinematic_preset/apply_sky_preset don't create one, so without this the
+    # render is nearly black). setup_multiple_scattering_sky() builds
+    # Sky Texture → Background → World Output and sets AgX view transform.
+    world_mod = importlib.import_module(
+        "bl_ext.user_default.blender_tools.world_setup")
+    import math
+    # Afternoon look: sun 30 deg above horizon, southwest azimuth.
+    # exposure_ev=0.0 keeps AgX neutral — the Nishita sky outputs physical
+    # radiance, so positive exposure on top of that blows out the highlights.
+    world_mod.setup_multiple_scattering_sky(
+        sun_elevation_rad=math.radians(30.0),
+        sun_rotation_rad=math.radians(210.0),
+        intensity=1.0,
+        air=1.0,
+        dust=1.0,
+        ozone=1.0,
+        exposure_ev=0.0,
+    )
+    # Sync the Sun light object to the afternoon preset (energy + colour).
     result = bpy.ops.blender_tools.apply_sky_preset("EXEC_DEFAULT", preset="afternoon")
     if result != {"FINISHED"}:
         raise RuntimeError(f"apply_sky_preset returned {result}")
+    # apply_sky_preset's "afternoon" sets the world Background strength to 0.2
+    # (tuned for an Eevee setup); restore it to 1.0 for the Cycles Nishita sky.
+    world = scene.world
+    if world and world.use_nodes:
+        for node in world.node_tree.nodes:
+            if node.type == "BACKGROUND":
+                node.inputs["Strength"].default_value = 1.0
+    # Keep the Sun energy moderate so the ortho drape isn't blown out.
+    for obj in bpy.data.objects:
+        if obj.type == "LIGHT" and obj.data.type == "SUN":
+            obj.data.energy = min(obj.data.energy, 3.0)
 
 _try("sky preset", _do_sky)
 
@@ -330,6 +399,29 @@ def _do_camera():
     if result != {"FINISHED"}:
         raise RuntimeError(f"import_csv_path returned {result}")
 
+    # XY offset fix — the terrain plane is centred at the Blender origin
+    # (spanning ±size/2 in X and Y), but the flight-path CSV is anchor-
+    # subtracted from the SW corner, so the path sits at local XY
+    # (0..size_x, 0..size_y) — i.e. shifted by (+size_x/2, +size_y/2)
+    # relative to the terrain.  Shift the curve object by (-half_x, -half_y)
+    # so it overlays the terrain.
+    half_x = half_y = 0.0
+    t_obj = bpy.data.objects.get(terrain_name) if terrain_name else None
+    if t_obj is None:
+        t_obj = next((o for o in bpy.data.objects
+                      if o.type == "MESH" and o.name.startswith("Terrain")), None)
+    if t_obj is not None:
+        xs = [v[0] for v in t_obj.bound_box]
+        ys = [v[1] for v in t_obj.bound_box]
+        half_x = (max(xs) - min(xs)) / 2.0
+        half_y = (max(ys) - min(ys)) / 2.0
+    for obj in bpy.data.objects:
+        if obj.type == "CURVE" and obj.name.startswith("FlightPath"):
+            obj.location = (-half_x, -half_y, 0.0)
+            print(f"[assemble] FlightPath XY shift: ({-half_x:.0f}, {-half_y:.0f})"
+                  " to overlay terrain")
+            break
+
     result = bpy.ops.blender_tools.setup_camera_rig(
         "EXEC_DEFAULT",
         banking_max_deg=8.0,
@@ -338,7 +430,11 @@ def _do_camera():
     if result != {"FINISHED"}:
         raise RuntimeError(f"setup_camera_rig returned {result}")
 
-    # Apply cinematic camera preset (lens + clip + altitude hints).
+    # apply_camera_preset auto-samples the terrain Z max (via _get_terrain_z_max)
+    # and lifts the camera curve to terrain_z + altitude_agl_m.  For the
+    # cinematic-establishing preset that is ~1685 + 800 = ~2485 m — well above
+    # the Allgäu peaks.  The operator also passes the curve_obj so the curve
+    # itself is lifted (not just the rig empty that FOLLOW_PATH would override).
     if scene.camera:
         result = bpy.ops.blender_tools.apply_camera_preset(
             "EXEC_DEFAULT", preset="cinematic-establishing")
@@ -346,6 +442,71 @@ def _do_camera():
             raise RuntimeError(f"apply_camera_preset returned {result}")
 
 _try("camera rig", _do_camera)
+
+# Post-camera: fix camera orientation for a clean aerial fly-over view.
+#
+# setup_camera_rig builds a rig Empty with FOLLOW_PATH + use_curve_follow=True
+# (tangent-aligned), parents the Camera to it; apply_camera_preset then sets a
+# 90-deg pitch on the camera (horizon-level forward look). With the path
+# running roughly E-W in UTM32N, that combination points the camera sideways
+# at a grazing angle and the terrain reads as an edge-on slab.
+#
+# Fix: disable use_curve_follow (so the rig just translates), strip any
+# tracking constraints, and set the camera to a fixed aerial pitch — looking
+# mostly straight down with a gentle forward tilt. The camera is parented to a
+# non-rotating rig, so its local rotation_euler is its world rotation.
+NADIR_FORWARD_TILT_DEG = 22.0   # 0 = straight down; 22 = mostly down, terrain fills frame
+
+def _fix_camera_orientation():
+    import math as _m
+    cam = scene.camera
+    if cam is None:
+        raise RuntimeError("no scene camera to fix orientation on")
+
+    rig_empty = cam.parent
+    if rig_empty is not None:
+        for c in rig_empty.constraints:
+            if c.type == "FOLLOW_PATH":
+                c.use_curve_follow = False
+                print("[assemble] disabled use_curve_follow on rig empty")
+                break
+        # Strip the noise F-curve modifier apply_camera_preset added to the rig
+        # rotation — it assumes a forward-looking rig and jitters our down view.
+        if rig_empty.animation_data:
+            rig_empty.animation_data_clear()
+        rig_empty.rotation_euler = (0.0, 0.0, 0.0)
+        # apply_camera_preset added a Z offset (terrain_z + altitude_agl) to the
+        # rig location; FOLLOW_PATH stacks that on top of the curve Z. We already
+        # lifted the curve to CRUISE_ALTITUDE_M, so zero the rig offset to keep
+        # the camera at exactly that altitude.
+        rig_empty.location = (0.0, 0.0, 0.0)
+
+    # Remove tracking constraints and any keyframed rotation on the camera.
+    for c in list(cam.constraints):
+        if c.type in {"DAMPED_TRACK", "TRACK_TO", "LOCKED_TRACK"}:
+            cam.constraints.remove(c)
+    if cam.animation_data:
+        cam.animation_data_clear()
+
+    # Aerial pitch: Blender camera at rotation (0,0,0) looks down -Z (nadir).
+    # rotation_euler.x tilts it toward +Y (world north) by that many degrees.
+    cam.rotation_euler = (_m.radians(NADIR_FORWARD_TILT_DEG), 0.0, 0.0)
+    print(f"[assemble] camera aerial pitch: {NADIR_FORWARD_TILT_DEG} deg from nadir, "
+          f"use_curve_follow=False")
+
+_try("camera orientation fix", _fix_camera_orientation)
+
+# Sync scene frame range to the flight-path curve duration so the 4 stills
+# sample meaningfully different points along the path (factory default is 250
+# which can be much shorter than the path's eval-time keyframes).
+for obj in bpy.data.objects:
+    if obj.type == "CURVE" and obj.name.startswith("FlightPath"):
+        pd = int(getattr(obj.data, "path_duration", 0) or 0)
+        if pd > 1:
+            scene.frame_start = 1
+            scene.frame_end = pd
+            print(f"[assemble] frame range synced to path_duration: 1-{pd}")
+        break
 
 cam_name = scene.camera.name if scene.camera else "(none)"
 print(f"[assemble] scene camera: {cam_name}")
@@ -401,8 +562,8 @@ scene.render.use_render_cache = False
 
 for i, frame in enumerate(render_frames):
     # Set filepath WITHOUT extension — Blender adds it when use_file_extension=True.
-    # Pattern: allgaeu_v1_frame0026 → Blender writes allgaeu_v1_frame0026.png
-    stem = f"allgaeu_v1_frame{frame:04d}"
+    # Pattern: allgaeu_v3_frame0026 → Blender writes allgaeu_v3_frame0026.png
+    stem = f"allgaeu_v3_frame{frame:04d}"
     out_path_no_ext = str(RENDERS_DIR / stem)
     expected_path = str(RENDERS_DIR / f"{stem}.png")
 
