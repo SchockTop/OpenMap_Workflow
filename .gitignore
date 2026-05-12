@@ -6,3 +6,6 @@ __pycache__/
 # Visual test artifacts (regenerated per run)
 workflows/tests/visual/artifacts/
 workflows/tests/visual/artifacts/.vision_cache/
+
+# Allgäu fly-over scene — large generated data
+downloads_osm/

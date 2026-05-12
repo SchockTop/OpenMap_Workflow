@@ -19,6 +19,18 @@ REGIONS: dict[str, str] = {
         "POLYGON((11.450 48.080, 11.585 48.080, "
         "11.585 48.118, 11.450 48.118, 11.450 48.080))"
     ),
+    # Allgäu fly-over — Forggensee / Schwangau / Füssen area (~45 km², ~9x10 km
+    # bbox). User-supplied Google Earth polygon; pre-alpine lakes + forest +
+    # the Schwangau castles. EPSG:25832 bbox is roughly (632k..642k, 5266k..5278k).
+    "allgaeu-forggensee": (
+        "POLYGON(("
+        "10.7725730737063 47.55479949436138, "
+        "10.83963591262588 47.6342185213709, "
+        "10.78083675631973 47.64802419330076, "
+        "10.71481653953351 47.57153264515765, "
+        "10.75609510295647 47.5653219635225, "
+        "10.7725730737063 47.55479949436138))"
+    ),
 }
 
 
