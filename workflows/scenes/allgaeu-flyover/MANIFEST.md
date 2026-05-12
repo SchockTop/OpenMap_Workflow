@@ -99,3 +99,12 @@ Nishita sky (sun 50° el / 150° az, energy 2.0 W, World strength 0.15), 4 keyfr
 at 1600–2400m absolute, saves `data/scene_allgaeu-forggensee.blend`, renders 4 stills.
 Final deliverable: `bpy.ops.file.pack_all()` → `scene.blend` (259 MB, not in git).
 </content>
+
+---
+
+## FINAL STATE (2026-05-13) — see README.md for the up-to-date hand-off
+
+- Parent repo `OpenMap_Workflow` @ `8698ec4` (pushed): region preset, plan, `workflows/_assemble_allgaeu.py` (v6), `workflows/_diag_v6*.py`, this folder's README/MANIFEST + `renders/allgaeu_v{3,4,5,6}_frame*.png`. (`workflows/_blender_assemble_full.py` rot was fixed in earlier commits — `setup_sky` removed, engine `BLENDER_EEVEE`, `--enable clouds`.)
+- Submodule `openmap_blender_tools` @ `8a70ad5` (pushed; parent pointer matches): clouds feature (`0260824`), tree forest-mask + leaf translucency (`5a6841b`), OSM-forest→mask rasterizer (`a73ec8e`), `build_cinematic_scene` operator + N-panel (`3440a98`), camera-elevation fix (`9d56574`), `<UDIM>`-token ortho fix (`8a70ad5`). Rebuilt `dist/blender_tools-0.1.0.zip`.
+- `scene.blend` (~270 MB, packed, **not in git**) is in this folder.
+- Status: data pipeline + tooling complete; renders are photo-real aerial (v5) + cinematic-framed (v6) but v6 still has grey edge-void wedges, a too-spiky mountain backdrop, no clouds in frame, and a flat sky — finishing those is camera/lighting/backdrop tuning in `_assemble_allgaeu.py`, no pipeline changes. See README "State after v6 — and how to finish it".
