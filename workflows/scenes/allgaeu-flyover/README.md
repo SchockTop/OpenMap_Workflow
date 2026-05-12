@@ -3,7 +3,8 @@
 Self-contained cinematic scene for the ~45 km² Allgäu polygon around Forggensee /
 Schwangau / Füssen (the Schwangau castles, pre-alpine lakes and forest).
 
-> **Status:** in progress — see `docs/superpowers/plans/2026-05-12-allgaeu-flyover-and-blender-scene-tool.md`.
+> **Status:** v4 cinematic look pass complete. `scene.blend` (258 MB, packed) is in this folder
+> but **not tracked in git** (>100 MB). See `MANIFEST.md` for regeneration instructions.
 > This folder is meant to be liftable on its own; `MANIFEST.md` lists every commit/file
 > added across the repo for this scene + the Blender-tool changes it depends on.
 
@@ -30,5 +31,11 @@ Schwangau / Füssen (the Schwangau castles, pre-alpine lakes and forest).
 ## Re-render
 
 Open `scene.blend` in Blender 5.1 (with the `openmap_blender_tools` extension installed),
-pick a frame on the camera path, render. Settings are baked in via the quality preset.
+pick a frame on the camera path, render. Settings: Cycles / OptiX, 128 spp + OIDN, 1920×1080.
+
+`scene.blend` is 258 MB (all data packed). To regenerate from processed data:
+```
+blender --background --python workflows/_assemble_allgaeu.py
+```
+Then pack via File → External Data → Pack All Resources.
 </content>

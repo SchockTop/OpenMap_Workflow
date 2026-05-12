@@ -48,11 +48,35 @@ extension). The `OpenMap_Unifier` submodule was **not** changed for this scene.
 - Rebuilt extension: `dist/blender_tools-0.1.0.zip` (install on the Blender machine via `blender --command extension install-file dist/blender_tools-0.1.0.zip --repo user_default --enable`).
 - (later: any iteration commits for cloud/tree tuning)
 
+## Packed scene.blend
+
+`workflows/scenes/allgaeu-flyover/scene.blend` — all data packed (110 UDIM ortho tiles +
+tree textures + building materials + heightmap). Size: ~258 MB.
+
+**Not tracked in git** (GitHub 100 MB limit). Regenerate:
+1. `blender --background --python workflows/_assemble_allgaeu.py`
+2. Open `data/scene_allgaeu-forggensee.blend` in Blender
+3. File → External Data → Make All Paths Absolute → Pack All Resources
+4. Save As `workflows/scenes/allgaeu-flyover/scene.blend`
+
+## v4 cinematic look pass
+
+Changes vs v3 (see `workflows/_assemble_allgaeu.py`):
+- **Ortho UDIM fix**: `bpy.data.images.load()` with `<UDIM>` token path instead of
+  loading tile 1001 + patching source; `buildings_textured.py` reuses same image.
+- **Ground shader removed from terrain**: was overwriting OrthoDrape material with
+  DOPProjector flat-projection that only sampled UDIM tile 1001 → grey ground.
+- **Camera pitch**: 50° off nadir (was 22°); bank roll +5°; `use_curve_follow=False`.
+- **Sky**: afternoon, sun 40° el / 225° az, energy 5.0 W, warm color, World strength 1.0.
+- **Clouds**: base lowered to 1700 m (camera at ~2485 m → above clouds), coverage 0.40.
+- **GPU rendering**: OptiX RTX 4070 (128 spp + OIDN); ~90 s/frame vs CPU minutes/frame.
+- **Resolution**: 1920×1080 (was 960×540).
+
 ## How this scene was assembled
 
-`blender --background --python workflows/_assemble_allgaeu.py` → calls
-`bpy.ops.blender_tools.build_cinematic_scene` on `data/processed/` (sky preset, camera
-preset = cinematic-establishing, quality = preview, clouds on, forest-masked trees,
-ortho-textured buildings) → saves `data/scene_allgaeu-forggensee.blend` → renders stills.
-Final deliverable: `bpy.ops.file.pack_all()` on that blend → saved here as `scene.blend`.
+`blender --background --python workflows/_assemble_allgaeu.py` → imports heightmap_clean.tif,
+DOP40 UDIM ortho (110 tiles via `<UDIM>` token), 7979 LoD2 buildings, forest-masked GN trees,
+volumetric cumulus deck (1700m base), Nishita afternoon sky, FOLLOW_PATH camera rig on 40-pt
+path at ~2485m AGL, saves `data/scene_allgaeu-forggensee.blend`, renders 4 stills at 10/35/60/90%.
+Final deliverable: `bpy.ops.file.pack_all()` → `scene.blend` (258 MB, not in git).
 </content>
