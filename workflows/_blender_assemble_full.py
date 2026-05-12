@@ -20,7 +20,7 @@ ap.add_argument("--out-blend", required=True)
 ap.add_argument("--render-png", default="")
 ap.add_argument("--engine", default="BLENDER_EEVEE_NEXT")
 ap.add_argument("--enable", nargs="*", default=[],
-                help="Feature module names to apply, e.g. buildings-textured trees")
+                help="Feature module names to apply, e.g. buildings-textured trees clouds")
 ap.add_argument("--camera-preset", default="cinematic-establishing",
                 help="Named camera envelope from camera_presets.CAMERA_PRESETS")
 ap.add_argument("--sky-preset", default="afternoon",
