@@ -379,6 +379,109 @@ This is the Blender 4.x+ idiom for per-instance edits to linked assets.
 
 Replace any `assets/textures/leaves/<species>_color.png` with a higher-resolution version. Keep the filename. Reopen the `.blend` and the new texture loads automatically (relative-path image references).
 
+## Session log — 2026-05-12/13: DOM-Mesh cutout + Allgäu cinematic scene + Blender scene-builder
+
+A pair-programming session that touched all three repos. Goals were: (1) productionise the
+DOM-Mesh range-cutout spike into OpenMap_Unifier; (2) deliver a finished fly-over `.blend` for a
+user-supplied ~45 km² Allgäu polygon (Forggensee / Schwangau / Füssen); (3) make the Blender tool
+fit a proxy-bound workflow — download maps on machine A (OpenMap_Unifier GUI), copy the folder to
+machine B, build the scene in Blender there — and add clouds.
+
+### What was added
+
+- **OpenMap_Unifier — DOM-Mesh cutout** (`backend/dommesh.py`): `LosIndex` (point → flight-day "Los"
+  from the project-areas KML), `SlpkReader` (HTTP-Range reader for the per-Los `DSM_Mesh.slpk` ZIP64/I3S
+  archive, per-Los cache, mirror fallback), `cutout(polygon_ewkt, out_dir, formats=("obj","glb"))` →
+  OBJ + a hand-rolled binary glTF 2.0. Catalog entry `dommesh` (`kind="mesh"`, new `mesh3d` category)
+  → shows up as a checkbox in the GUI; GUI dispatch + Downloads-tab folder; web `POST /start-download-dommesh`
+  + page button; `test_dommesh.py` + `conftest.py` (`needs_network` marker gated by `DOMMESH_LIVE`).
+- **openmap_blender_tools — new features & ops:** `dommesh_import.py` + `BLENDERTOOLS_OT_import_dommesh`
+  (import a DOM-Mesh slice `.glb`, re-anchor into the scene's UTM frame); `features/clouds.py` — a
+  procedural **volumetric** cumulus deck (+ optional thin cirrus) + `BLENDERTOOLS_OT_add_clouds`;
+  forest-masked tree scatter (`density_mask` driven by a forest-mask GeoTIFF) + a subtle leaf-translucency
+  tweak; `geo_import.rasterize_forest_mask` / `greenness_mask` (OSM land-use forest polygons → 0/1 mask
+  GeoTIFF, with a numpy fallback when system `gdal_rasterize` is absent); the one-stop
+  `BLENDERTOOLS_OT_build_cinematic_scene` operator (folder → terrain + ortho + ortho-textured buildings +
+  forest-masked trees + clouds + sky + camera + quality; accepts raw tiles *or* an already-GDAL-processed
+  folder; options in the redo panel) + a reworked **OpenMap N-panel** ("Build Cinematic Scene from Folder"
+  button on top, per-step buttons below); terrain-elevation-aware fly-over camera; smoke tests
+  (`smoke_dommesh.py`, `smoke_clouds.py`). Rebuilt `dist/blender_tools-0.1.0.zip`.
+- **workflows / the Allgäu scene:** `allgaeu-forggensee` region preset; `workflows/_assemble_allgaeu.py`
+  (headless scene build from `data/processed/`); `workflows/scenes/allgaeu-flyover/` — the self-contained
+  deliverable folder (packed `scene.blend` ~270 MB *not in git*, render passes v3→v6, README + MANIFEST
+  with full provenance + a "how to finish the shot" list); the plan in
+  `docs/superpowers/plans/2026-05-12-allgaeu-flyover-and-blender-scene-tool.md`.
+
+### What was fixed (the interesting ones)
+
+- **DOM-Mesh behind a proxy:** raw `urllib` picks up the Windows registry/PAC proxy that `requests`
+  ignores → connection refused (WinError 10061) on corporate networks where the other downloaders work.
+  Rewrote `dommesh.py`'s HTTP to use `requests` + an optional `ProxyManager` session (GUI passes
+  `proxy_manager.get_session()`). Then: `download*.bayernwolke.de` returns `content-range` lowercased →
+  `file_size()` failed on `dict(headers)` → use the case-insensitive headers object. Then: a Range-stripping
+  proxy makes the server return `200` + the whole ~99 GB file → with `stream=False` that downloaded
+  silently with no error → `stream=True` + reject any non-`206` response before reading the body +
+  `(15s, 120s)` timeouts + stop swallowing per-page errors. Then perf: `nodes()` was reading the
+  nodepages **one entry at a time** (~5 000 sequential range requests, ~12–18 min, or a silent 99 GB
+  pull if Range was stripped) → one ~13 MB contiguous read of the nodepages block + carve each entry from
+  the blob; per-node `read_entry` went from 2 range requests to 1.
+- **Pipeline / Blender, building the Allgäu scene:** Eevee renders **black** in `--background` on Windows
+  → use Cycles. The DGM1 `-9999` NoData in the drawn-down Forggensee punched the Displace-modified terrain
+  to Z=-9999 (read as a thin slab) → NoData-fill → `data/processed/heightmap_clean.tif`. The fly-over
+  camera was placed at an **absolute** altitude (~800 m) below the ~760–1685 m mountain terrain → camera
+  buried in the mesh → made `camera_presets.py` sample the terrain's displaced Z-max and place the camera
+  at *terrain elevation + AGL*. The World had no sky node tree → black render → Nishita/Multiple-Scattering
+  sky. `pyproj` isn't in Blender 5.1's bundled Python → pre-convert the flight path to UTM. The DOP **ortho
+  UDIM didn't render in headless Cycles** ("Image file does not exist") because it was loaded as tile 1001
+  with a patched path → load it via the `<UDIM>`-token path (absolute) + `image.source='TILED'`. The
+  `ground_shader` feature was overwriting the ortho-drape material with a flat-projected DOP that only
+  sampled UDIM tile 1001 → grey ground → keep the `OrthoDrape` material on the terrain. The AOI polygon is
+  a rotated diamond, so ~24 corner tiles of the bbox-aligned UDIM grid are empty → grey corner slabs in
+  frames that caught a corner → backfilled the empty tiles with a mottled dark-green fill. `_blender_assemble_full.py`
+  had bit-rotted (`bpy.ops.blender_tools.setup_sky` was renamed to `apply_sky_preset`; `BLENDER_EEVEE_NEXT`
+  is invalid in Blender 5.1 — it's `BLENDER_EEVEE`) → fixed. `test_map_types.py`'s catalog-shape test
+  hard-coded `kind ∈ {raw, wms}` → added `mesh`.
+- **`features/clouds.py` noise-scale bug:** the cloud volume's density noise is wired to the cloud box's
+  *Object* texture coords assuming a 1×1×1 box, but the box mesh has the box dimensions baked in (~14 km),
+  so the noise ran at ~17 500 cycles = incoherent per-voxel = invisible clouds (this is why v4/v5 showed no
+  clouds). Worked around in `_assemble_allgaeu.py` (rescale the Noise `Scale` by `1/half-extent`); should
+  be fixed at source in `clouds.py` (use *Generated* coords + fix the vertical falloff).
+
+### Where it struggled / what's still rough
+
+- **Cinematic framing took four render passes (v3→v6).** v3 had the camera below the terrain (the
+  altitude bug). v4 fixed the ortho but was near-nadir / overexposed. v5 fixed exposure and the look
+  (photo-real oblique aerials — `allgaeu_v5_frame{0060,0180}.png` are genuinely good) but had **no sky,
+  no mountains, no clouds in frame**. v6 got sky + a mountain horizon + clouds in frame, but: the AOI's
+  own terrain tops out at 1685 m (the real big peaks — Säuling, Tegelberg — are *just outside* the polygon),
+  so the horizon "mountains" are a **procedural emission-only ridge ~11 km south** standing in for the Alps
+  in haze (reads OK as a silhouette but is a bit too spiky/uniform); the cumulus renders as a dark band
+  rather than bright broken puffs (density too high for the −1.5 EV / AgX look); there's a desaturated
+  "gap band" of empty sky-horizon between the AOI's south edge and the procedural ridge; and the high
+  establishing shot is milky from aerial-haze over a long sightline. All of that is camera/lighting/backdrop
+  *tuning* in `_assemble_allgaeu.py` (and the cloud kwargs) — the scene is built; finishing the shot is a
+  keyboard sitting, with the exact knobs listed in `workflows/scenes/allgaeu-flyover/README.md`.
+- **45 km² is at the edge of the pipeline's tuning** (biggest tested preset was ~40 km²): terrain subdiv 11
+  ≈ 4.4 m/quad over 9 km is fine from the air but loses fine relief; the 122 MB heightmap + 110-tile UDIM
+  ortho + 7 979 LoD2 buildings + a volumetric cloud deck + aerial haze make a heavy scene — ~3–5 min/frame
+  on an RTX 4070 with OptiX. From ~1.5–2.4 km altitude the decimated 3D trees render as noise specks, so
+  forest is carried by a darken+noise-bump overlay on the ortho instead (the GN 3D-tree scatter is still in
+  the `.blend`, render-hidden, for low passes).
+- **DOM-Mesh size economics:** a city-scale polygon overlaps tens of thousands of I3S leaf nodes
+  (~0.2–0.6 MB each, ~3–9 k triangles each) — a 45 km² AOI ≈ ~20 k nodes ≈ ~10 GB download / ~100 M
+  triangles, far too heavy. The cutout is for tight "hero" patches (~0.3–1 km², a few MB, ~1–5 M triangles),
+  not regions — so `cutout()` now logs the overlapping-node count + a rough size estimate up front and warns
+  past ~1 500 nodes.
+- **Subagent coordination got messy.** The download / GDAL / Blender-assembly / render work ran as
+  background subagents; a couple of them spawned their *own* background Blender processes and reported
+  mid-flight, which led to brief races over `data/scene_allgaeu-forggensee.blend` and the render filenames.
+  Manageable, but a cleaner pattern would be one render agent at a time with versioned output names.
+
+(Submodule commits & file lists: `workflows/scenes/allgaeu-flyover/MANIFEST.md`. OpenMap_Unifier dommesh:
+`backend/dommesh.py`, `test_dommesh.py`, `conftest.py`, the catalog/GUI/web changes. openmap_blender_tools:
+`features/clouds.py`, `dommesh_import.py`, `geo_import.py` mask helpers, `features/trees.py`, the new
+operators in `operators.py`, `camera_presets.py`, `terrain_setup.py` UDIM fix.)
+
 ## Submodule URLs
 
 Currently `file://` paths for offline development. Re-point to GitHub once the
