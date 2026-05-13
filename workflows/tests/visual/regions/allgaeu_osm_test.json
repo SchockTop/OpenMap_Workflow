@@ -1,0 +1,9 @@
+{
+    "name": "allgaeu_osm_test",
+    "centre_utm32n_e": 637000,
+    "centre_utm32n_n": 5272000,
+    "size_m": 500,
+    "description": "500m AOI inside the allgaeu-forggensee preset bbox (Schwangau / Forggensee area) — forest/meadow/road boundary",
+    "needs_layers": ["dgm1", "dop20", "lod2", "osm"],
+    "source_preset": "allgaeu-forggensee"
+}
