@@ -10,5 +10,3 @@ workflows/tests/visual/artifacts/.vision_cache/
 # Allgäu fly-over scene — large generated data
 downloads_osm/
 
-# Packed scene.blend is 258 MB — over GitHub 100 MB limit; not tracked in git
-workflows/scenes/allgaeu-flyover/scene.blend
