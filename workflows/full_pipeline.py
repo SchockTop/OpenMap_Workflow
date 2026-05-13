@@ -213,7 +213,8 @@ def phase5_blender(heightmap: Path,
                    enable: Optional[list[str]] = None,
                    camera_preset: str = "cinematic-establishing",
                    sky_preset: str = "afternoon",
-                   quality: str = "preview") -> int:
+                   quality: str = "preview",
+                   osm_geojson: Optional[Path] = None) -> int:
     blender_script = ROOT / "workflows" / "_blender_assemble_full.py"
     cmd = [
         str(BLENDER), "--background", "--python", str(blender_script), "--",
@@ -234,6 +235,8 @@ def phase5_blender(heightmap: Path,
         cmd += ["--render-png", str(render_png)]
     if enable:
         cmd += ["--enable", *enable]
+    if osm_geojson and Path(osm_geojson).is_file():
+        cmd += ["--osm-geojson", str(osm_geojson)]
     print(f"[5] Blender -> {out_blend}")
     return subprocess.call(cmd)
 
@@ -398,6 +401,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--enable", nargs="*", default=[],
                     help="Feature modules to apply (e.g. buildings-textured trees)")
     ap.add_argument("--data-dir", type=Path, default=ROOT / "data")
+    ap.add_argument("--osm-geojson", type=Path, default=None,
+                    help="Optional OSM polygons GeoJSON (EPSG:25832) to "
+                         "rasterize into per-class semantic masks; trees and "
+                         "grass scatter pick them up automatically.")
     args = ap.parse_args(argv)
 
     skip_download = args.skip_download or any(
@@ -475,7 +482,8 @@ def main(argv: list[str] | None = None) -> int:
                           enable=args.enable,
                           camera_preset=args.camera_preset,
                           sky_preset=args.sky_preset,
-                          quality=args.quality)
+                          quality=args.quality,
+                          osm_geojson=args.osm_geojson)
 
 
 if __name__ == "__main__":

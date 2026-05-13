@@ -38,6 +38,9 @@ ap.add_argument("--bbox-utm32n", nargs=4, type=float, required=True,
 ap.add_argument("--out-dir", required=True)
 ap.add_argument("--engine", default="BLENDER_EEVEE_NEXT")
 ap.add_argument("--resolution", nargs=2, type=int, default=[960, 540])
+ap.add_argument("--osm-geojson", default="",
+                help="Optional OSM polygons GeoJSON (EPSG:25832); rasterized "
+                     "into per-class semantic masks for trees/grass scatter.")
 args = ap.parse_args(argv)
 
 OUT = Path(args.out_dir)
@@ -144,6 +147,17 @@ plane = terrain_setup.build_terrain_from_heightmap(
 if args.ortho_dir and Path(args.ortho_dir).is_dir():
     terrain_setup.apply_ortho_drape(plane, args.ortho_dir)
 render_layer(3, "heightmap")
+
+
+# ---------------------------------------------------------------- 03b OSM semantic masks (optional)
+if args.osm_geojson and Path(args.osm_geojson).is_file():
+    osm_rasterize = importlib.import_module(
+        "bl_ext.user_default.blender_tools.osm_rasterize")
+    masks_dir = Path(args.out_dir) / "osm_masks"
+    bbox_tuple = (xmin, ymin, xmax, ymax)
+    osm_rasterize.build_masks(Path(args.osm_geojson), bbox_tuple, 1.0, masks_dir)
+    scene["osm_masks_dir"] = str(masks_dir)
+    print(f"[progressive] OSM masks at {masks_dir}")
 
 
 # ---------------------------------------------------------------- shared feature context

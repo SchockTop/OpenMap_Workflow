@@ -29,6 +29,9 @@ ap.add_argument("--sky-preset", default="afternoon",
 ap.add_argument("--quality", default="preview",
                 choices=["draft", "preview", "final"],
                 help="Render quality envelope (resolution + samples + simplify caps).")
+ap.add_argument("--osm-geojson", default="",
+                help="Optional OSM polygons GeoJSON (EPSG:25832); rasterized "
+                     "into per-class semantic masks for trees/grass scatter.")
 args = ap.parse_args(argv)
 
 ext = importlib.import_module("bl_ext.user_default.blender_tools")
@@ -77,6 +80,15 @@ print(f"[blender] terrain built ({size_x:.0f} x {size_y:.0f} m)")
 if args.ortho_dir and Path(args.ortho_dir).is_dir():
     terrain_setup.apply_ortho_drape(plane, args.ortho_dir)
     print(f"[blender] ortho drape from {args.ortho_dir}")
+
+# 3b. OSM semantic masks (optional).
+if args.osm_geojson and Path(args.osm_geojson).is_file():
+    osm_rasterize = importlib.import_module("bl_ext.user_default.blender_tools.osm_rasterize")
+    masks_dir = Path(args.out_blend).parent / "osm_masks"
+    bbox_tuple = (xmin, ymin, xmax, ymax)
+    osm_rasterize.build_masks(Path(args.osm_geojson), bbox_tuple, 1.0, masks_dir)
+    bpy.context.scene["osm_masks_dir"] = str(masks_dir)
+    print(f"[blender] OSM masks at {masks_dir}")
 
 # 4. LoD2 buildings (if CityJSON available).
 building_objs = []
