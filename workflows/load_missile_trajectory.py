@@ -32,6 +32,11 @@ MISSILE_NAME = "Missile"
 CONTROL_NAME = "Missile_Control"
 KEYFRAME_INTERPOLATION = "LINEAR"
 
+# Multiplier applied to CSV positions only (rotations and rocket mesh size
+# are untouched). Use this when the Blender scene is at a different scale
+# than the trajectory was measured at, e.g. PATH_SCALE = 1/8 for a 1:8 world.
+PATH_SCALE = 1.0
+
 
 def load_trajectory(csv_path: str | Path) -> list[dict]:
     rows: list[dict] = []
@@ -91,9 +96,10 @@ def animate_missile(
     fps = scene.render.fps / scene.render.fps_base
     t0 = rows[0]["t"]
 
+    s = PATH_SCALE
     for row in rows:
         frame = scene.frame_start + (row["t"] - t0) * fps
-        missile.location = (row["px"], row["py"], row["pz"])
+        missile.location = (row["px"] * s, row["py"] * s, row["pz"] * s)
         missile.rotation_euler = (row["rx"], row["ry"], row["rz"])
         missile.keyframe_insert("location", frame=frame)
         missile.keyframe_insert("rotation_euler", frame=frame)
