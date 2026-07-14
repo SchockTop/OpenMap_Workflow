@@ -57,6 +57,54 @@ independently:
 | `IElevationProvider` | height queries | `TiledElevationProvider` (on-demand download + LRU) |
 | `IDatasetCatalog` | dataset metadata | `BayernCatalog` / `NiedersachsenCatalog` |
 
+## Coordinate conversions — every CRS German geodata comes in
+
+`OpenMapUnifier.Core.Geodesy` covers the full zoo (all verified against
+pyproj; the projection engine is the ellipsoid-generic Karney/Krüger series):
+
+| EPSG | CRS | Class |
+|---|---|---|
+| 4326 | WGS 84 lat/lon (+ DMS strings) | `GeoPoint`, `Dms` |
+| 25832 / 25833 | ETRS89 / UTM 32N & 33N | `Etrs89UtmTransform` |
+| 32632 / 32633 | WGS 84 / UTM 32N & 33N | `Wgs84UtmTransform` |
+| 4647 / 5650 | zone-prefixed UTM ("zE-N", 32xxxxxx eastings) | `ZonePrefixedUtmTransform` |
+| 3857 | Web Mercator (web map exports) | `WebMercatorTransform` |
+| 31466–31469 | Gauß-Krüger 2–5 (legacy DHDN/Bessel, incl. the 7-param Helmert datum shift) | `GaussKruegerTransform` |
+
+Building blocks are public too: `TransverseMercator` (any ellipsoid),
+`HelmertTransform` (7-parameter position-vector + geodetic↔ECEF),
+`Ellipsoid` (GRS80/WGS84/Bessel), `CrsRegistry.Convert(x, y, fromEpsg, toEpsg)`
+for any-to-any conversion.
+
+**"I have no clue what CRS these numbers are":**
+
+```bash
+openmap detect 4468517.5 5333330.5
+# -> EPSG:31468 (Gauß-Krüger zone 4) [95%] ... plus the position in EVERY known CRS
+openmap convert 4468517.54 5333330.45 --from 31468 --to 25832
+```
+
+`CoordinateDetector.Detect(a, b)` returns ranked interpretations (both axis
+orders) scored by whether the result lands in Germany. Genuinely ambiguous
+inputs (a bare UTM easting fits zone 32 AND 33) return multiple candidates —
+check the ranked list instead of trusting one blindly.
+
+**Chaotic JSON import** — recover coordinates from any messy JSON, whatever
+the format mix:
+
+```bash
+openmap import-json flightplan.json --to 25832 --out normalized.geojson
+```
+
+`ChaoticJsonImporter` walks the whole document and recognizes named pairs in
+any spelling (lat/lon/lng/breite/laenge, x/y, easting/northing,
+Rechtswert/Hochwert, ostwert/nordwert, utm_x/utm_y — numbers or numeric
+strings, dot or comma decimals), GeoJSON-style arrays, DMS strings
+("48°08'14\"N 11°34'32\"E"), coordinate pairs inside prose, and z/alt/hoehe
+elevations. Each find reports its JSON path, the detected CRS and a
+confidence — low-confidence rows are flagged for manual review. Output is a
+normalized GeoJSON with full provenance per point.
+
 ## Corporate proxy support
 
 `OpenMapUnifier.Core.Proxy.ProxyManager` ports the Python Unifier's proxy

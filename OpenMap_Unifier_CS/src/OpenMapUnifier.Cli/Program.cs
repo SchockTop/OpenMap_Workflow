@@ -21,6 +21,8 @@ try
         "height" => await Height(args),
         "profile" => await Profile(args),
         "convert" => Convert_(args),
+        "detect" => Detect(args),
+        "import-json" => ImportJson(args),
         "proxy-test" => await ProxyTest(args),
         _ => Help(),
     };
@@ -52,7 +54,16 @@ static int Help()
           openmap height --latlon <lat> <lon> [...]      (lat/lon works for every state)
           openmap profile <fromE> <fromN> <toE> <toN> [--state CODE] [--samples N] [--cache DIR]
           openmap convert --to-utm <lat> <lon> | --to-latlon <easting> <northing> [--zone 32|33]
+          openmap convert <x> <y> --from <epsg> --to <epsg>
+          openmap detect <a> <b>            what CRS is this pair? ranked guesses + all conversions
+          openmap import-json <file> [--to <epsg>] [--out <file.geojson>]
+                                            recover coordinates from messy JSON, any format mix
           openmap proxy-test [proxy options]
+
+        Known EPSG codes: 4326, 25832/25833 (ETRS89 UTM), 32632/32633 (WGS84 UTM),
+          4647/5650 (zone-prefixed UTM), 3857 (Web Mercator), 31466-31469 (Gauß-Krüger 2-5)
+        Axis order for --from/--to 4326 is lon lat (GIS x,y convention);
+        unsure what your numbers are? -> openmap detect <a> <b>
 
         Elevation datasets: dgm1 everywhere (default); surface models where open:
           by: dgm5, dom20 | ni/he/th/mv/be/sn/st/bw/rp/sl/hb/hh: dom1 | bb: bdom
@@ -231,6 +242,16 @@ static async Task<int> Profile(string[] args)
 
 static int Convert_(string[] args)
 {
+    // General EPSG-to-EPSG conversion via the registry.
+    if (GetOption(args, "--from") is { } fromText && GetOption(args, "--to") is { } toText)
+    {
+        if (args.Length < 3) throw new ArgumentException("convert needs <x> <y> before --from/--to.");
+        var (x, y) = CrsRegistry.Convert(ParseDouble(args[1]), ParseDouble(args[2]),
+            int.Parse(fromText, CultureInfo.InvariantCulture), int.Parse(toText, CultureInfo.InvariantCulture));
+        Console.WriteLine(FormattableString.Invariant($"{x:F4} {y:F4}"));
+        return 0;
+    }
+
     var zone = int.Parse(GetOption(args, "--zone") ?? "32", CultureInfo.InvariantCulture);
     var t = Etrs89UtmTransform.ForZone(zone);
     if (GetOptionIndex(args, "--to-utm") is { } i && args.Length > i + 2)
@@ -245,7 +266,105 @@ static int Convert_(string[] args)
         Console.WriteLine(t.ToGeo(utm).ToString());
         return 0;
     }
-    throw new ArgumentException("Use: convert --to-utm <lat> <lon>  OR  convert --to-latlon <E> <N>.");
+    throw new ArgumentException(
+        "Use: convert --to-utm <lat> <lon> | convert --to-latlon <E> <N> | convert <x> <y> --from <epsg> --to <epsg>.");
+}
+
+static int Detect(string[] args)
+{
+    if (args.Length < 3) throw new ArgumentException("detect needs two numbers: detect <a> <b>.");
+    var a = ParseDouble(args[1]);
+    var b = ParseDouble(args[2]);
+
+    var guesses = CoordinateDetector.Detect(a, b);
+    if (guesses.Count == 0)
+    {
+        Console.WriteLine("No plausible interpretation — values match no known German CRS range.");
+        return 1;
+    }
+
+    Console.WriteLine($"Interpretations for ({a}, {b}), most likely first:");
+    foreach (var guess in guesses)
+        Console.WriteLine($"  {guess}");
+
+    var best = guesses[0];
+    Console.WriteLine();
+    Console.WriteLine($"Best guess EPSG:{best.Epsg} — the same position in every known CRS:");
+    Console.WriteLine(FormattableString.Invariant(
+        $"  {"lat/lon (EPSG:4326)",-34} {best.Geo.Latitude:F7}, {best.Geo.Longitude:F7}"));
+    Console.WriteLine($"  {"DMS",-34} {Dms.Format(best.Geo)}");
+    foreach (var epsg in new[] { 25832, 25833, 32632, 4647, 3857, 31468 })
+    {
+        var (x, y) = CrsRegistry.FromGeo(epsg, best.Geo);
+        Console.WriteLine(FormattableString.Invariant(
+            $"  {CrsRegistry.Get(epsg).Name + $" (EPSG:{epsg})",-34} {x:F3}, {y:F3}"));
+    }
+    return 0;
+}
+
+static int ImportJson(string[] args)
+{
+    var file = Require(args, 1, "JSON file path");
+    var targetEpsg = int.Parse(GetOption(args, "--to") ?? "25832", CultureInfo.InvariantCulture);
+
+    var found = OpenMapUnifier.Core.Import.ChaoticJsonImporter.ScanFile(file);
+    if (found.Count == 0)
+    {
+        Console.WriteLine("No coordinates recognized in this JSON.");
+        return 1;
+    }
+
+    Console.WriteLine($"{found.Count} coordinate(s) found; converted to EPSG:{targetEpsg}:");
+    foreach (var f in found)
+    {
+        var (x, y) = f.In(targetEpsg);
+        var zText = f.Z is { } z ? FormattableString.Invariant($"  z={z:F2}") : "";
+        Console.WriteLine(FormattableString.Invariant(
+            $"  {f.Path,-40} {x,12:F2} {y,12:F2}{zText}  [EPSG:{f.Guess.Epsg} {f.Guess.Confidence:P0}] {f.Guess.Reason}"));
+        if (f.Guess.Confidence < 0.6)
+            Console.WriteLine($"  {"",40} ^ LOW CONFIDENCE — verify this one manually");
+    }
+
+    if (GetOption(args, "--out") is { } outPath)
+    {
+        // Normalized GeoJSON (WGS84 per spec) with provenance properties.
+        using var ms = new MemoryStream();
+        using (var w = new System.Text.Json.Utf8JsonWriter(ms, new System.Text.Json.JsonWriterOptions { Indented = true }))
+        {
+            w.WriteStartObject();
+            w.WriteString("type", "FeatureCollection");
+            w.WriteStartArray("features");
+            foreach (var f in found)
+            {
+                w.WriteStartObject();
+                w.WriteString("type", "Feature");
+                w.WriteStartObject("geometry");
+                w.WriteString("type", "Point");
+                w.WriteStartArray("coordinates");
+                w.WriteNumberValue(Math.Round(f.Geo.Longitude, 8));
+                w.WriteNumberValue(Math.Round(f.Geo.Latitude, 8));
+                if (f.Z is { } z) w.WriteNumberValue(Math.Round(z, 3));
+                w.WriteEndArray();
+                w.WriteEndObject();
+                w.WriteStartObject("properties");
+                w.WriteString("sourcePath", f.Path);
+                w.WriteString("sourceRaw", f.Raw);
+                w.WriteNumber("detectedEpsg", f.Guess.Epsg);
+                w.WriteString("detectedCrs", f.Guess.CrsName);
+                w.WriteNumber("confidence", Math.Round(f.Guess.Confidence, 3));
+                var (tx, ty) = f.In(targetEpsg);
+                w.WriteNumber($"epsg{targetEpsg}_x", Math.Round(tx, 3));
+                w.WriteNumber($"epsg{targetEpsg}_y", Math.Round(ty, 3));
+                w.WriteEndObject();
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+        File.WriteAllBytes(outPath, ms.ToArray());
+        Console.WriteLine($"Normalized GeoJSON written to {outPath}");
+    }
+    return 0;
 }
 
 static async Task<int> ProxyTest(string[] args)
