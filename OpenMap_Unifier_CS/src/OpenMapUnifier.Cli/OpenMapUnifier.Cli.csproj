@@ -8,5 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="../OpenMapUnifier.Core/OpenMapUnifier.Core.csproj" />
     <ProjectReference Include="../OpenMapUnifier.Bayern/OpenMapUnifier.Bayern.csproj" />
+    <ProjectReference Include="../OpenMapUnifier.Niedersachsen/OpenMapUnifier.Niedersachsen.csproj" />
   </ItemGroup>
 </Project>

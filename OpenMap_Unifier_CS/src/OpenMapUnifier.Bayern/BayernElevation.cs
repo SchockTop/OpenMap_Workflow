@@ -49,7 +49,8 @@ public static class BayernElevation
         }
 
         public TileId TileFor(Utm32Point position) => TileGrid.TileFor(position, GridKm);
-        public DownloadJob JobFor(TileId tile) => _source.JobFor(_datasetId, tile);
+        public Task<DownloadJob?> JobForAsync(TileId tile, CancellationToken ct = default) =>
+            Task.FromResult<DownloadJob?>(_source.JobFor(_datasetId, tile));
         public HeightGrid Parse(string localPath, TileId tile) => GeoTiffReader.Read(localPath);
     }
 
@@ -66,7 +67,8 @@ public static class BayernElevation
         }
 
         public TileId TileFor(Utm32Point position) => TileGrid.TileFor(position, GridKm);
-        public DownloadJob JobFor(TileId tile) => _source.JobFor("dgm5", tile);
+        public Task<DownloadJob?> JobForAsync(TileId tile, CancellationToken ct = default) =>
+            Task.FromResult<DownloadJob?>(_source.JobFor("dgm5", tile));
         public HeightGrid Parse(string localPath, TileId tile) => XyzGridReader.ReadZip(localPath);
     }
 }

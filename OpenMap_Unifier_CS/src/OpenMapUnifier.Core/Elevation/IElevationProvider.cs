@@ -17,14 +17,17 @@ public interface IElevationProvider
 
 /// <summary>
 /// Maps positions to height tiles for one dataset: which grid cell, what to
-/// download, and how to parse the file. Implemented per product (DGM1 GeoTIFF,
-/// DGM5 zipped XYZ, DOM20 surface model) in the Bayern package; implement it
-/// yourself to plug any other elevation source into <see cref="TiledElevationProvider"/>.
+/// download, and how to parse the file. Implemented per product in the Bayern
+/// and Niedersachsen packages; implement it yourself to plug any other
+/// elevation source into <see cref="TiledElevationProvider"/>.
+/// JobForAsync is async because some providers (Niedersachsen's STAC API)
+/// must query a service to resolve a tile's download URL; it may return null
+/// when the tile has no coverage.
 /// </summary>
 public interface IHeightTileResolver
 {
     int GridKm { get; }
     TileId TileFor(Utm32Point position);
-    DownloadJob JobFor(TileId tile);
+    Task<DownloadJob?> JobForAsync(TileId tile, CancellationToken ct = default);
     HeightGrid Parse(string localPath, TileId tile);
 }

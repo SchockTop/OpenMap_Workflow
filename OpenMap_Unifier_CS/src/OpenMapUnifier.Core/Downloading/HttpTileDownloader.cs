@@ -1,3 +1,5 @@
+using OpenMapUnifier.Core.Proxy;
+
 namespace OpenMapUnifier.Core.Downloading;
 
 public sealed class DownloaderOptions
@@ -15,6 +17,13 @@ public sealed class DownloaderOptions
     public bool SkipExisting { get; set; } = true;
 
     public string UserAgent { get; set; } = "OpenMapUnifier.NET/1.0";
+
+    /// <summary>
+    /// Corporate proxy / TLS configuration. When set, its handler drives every
+    /// request and its error classifier annotates failures ([PROXY_AUTH]...).
+    /// When null, the environment (HTTPS_PROXY etc.) applies as usual.
+    /// </summary>
+    public ProxyManager? Proxy { get; set; }
 }
 
 /// <summary>
@@ -33,7 +42,7 @@ public sealed class HttpTileDownloader : IDownloader, IDisposable
     {
         _options = options ?? new DownloaderOptions();
         _ownsClient = httpClient is null;
-        _http = httpClient ?? new HttpClient(new SocketsHttpHandler
+        _http = httpClient ?? new HttpClient(_options.Proxy?.CreateHandler() ?? new SocketsHttpHandler
         {
             AutomaticDecompression = System.Net.DecompressionMethods.All,
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
@@ -153,7 +162,10 @@ public sealed class HttpTileDownloader : IDownloader, IDisposable
         catch (HttpRequestException e)
         {
             TryDelete(partPath);
-            return (false, $"Network error: {e.Message}", true);
+            // Classified errors ([PROXY_AUTH]/[SSL]/...) make corporate-proxy
+            // failures diagnosable, like the Python Unifier's classify_error.
+            var (code, message) = Core.Proxy.ProxyManager.ClassifyError(e);
+            return (false, $"[{code}] {message}", true);
         }
         catch (IOException e)
         {

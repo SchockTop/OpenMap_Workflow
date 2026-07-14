@@ -53,7 +53,9 @@ public sealed class TiledElevationProvider : IElevationProvider, IDisposable
 
     private async Task<HeightGrid?> LoadAsync(TileId tile, CancellationToken ct)
     {
-        var job = _resolver.JobFor(tile);
+        var job = await _resolver.JobForAsync(tile, ct).ConfigureAwait(false);
+        if (job is null)
+            return null;
         var result = await _downloader.DownloadAsync(job, CacheDirectory, ct: ct).ConfigureAwait(false);
         if (!result.Success || result.LocalPath is null)
             return null;

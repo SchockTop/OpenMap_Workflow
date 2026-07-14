@@ -94,8 +94,9 @@ public class DownloadAndElevationTests : IDisposable
         public int ParseCalls;
         public int GridKm => 1;
         public TileId TileFor(Utm32Point p) => TileGrid.TileFor(p);
-        public DownloadJob JobFor(TileId tile) =>
-            new($"{tile.Key}.tif", $"https://tiles.example/{tile.Key}.tif");
+        public Task<DownloadJob?> JobForAsync(TileId tile, CancellationToken ct = default) =>
+            Task.FromResult<DownloadJob?>(
+                new DownloadJob($"{tile.Key}.tif", $"https://tiles.example/{tile.Key}.tif"));
 
         public HeightGrid Parse(string localPath, TileId tile)
         {

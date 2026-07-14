@@ -5,7 +5,9 @@ using OpenMapUnifier.Core.Downloading;
 using OpenMapUnifier.Core.Elevation;
 using OpenMapUnifier.Core.Geodesy;
 using OpenMapUnifier.Core.Grid;
+using OpenMapUnifier.Core.Proxy;
 using OpenMapUnifier.Core.Raster;
+using OpenMapUnifier.Niedersachsen;
 
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "help";
 try
@@ -13,11 +15,12 @@ try
     return command switch
     {
         "datasets" => Datasets(),
-        "tiles" => Tiles(args),
+        "tiles" => await Tiles(args),
         "download" => await Download(args),
         "height" => await Height(args),
         "profile" => await Profile(args),
         "convert" => Convert_(args),
+        "proxy-test" => await ProxyTest(args),
         _ => Help(),
     };
 }
@@ -30,47 +33,74 @@ catch (Exception e)
 static int Help()
 {
     Console.WriteLine("""
-        OpenMapUnifier .NET — Bayern OpenData downloader & terrain queries (EPSG:25832)
+        OpenMapUnifier .NET — OpenData downloader & terrain queries (EPSG:25832)
+        States: --state by (Bayern LDBV, default) | --state ni (Niedersachsen LGLN)
 
         Usage:
           openmap datasets
-          openmap tiles <dataset> --bbox <minE,minN,maxE,maxN>
-          openmap download <dataset> --bbox <minE,minN,maxE,maxN> [--out DIR] [--parallel N] [--sidecars]
-          openmap height <easting> <northing> [--dataset dgm1|dgm5|dom20] [--cache DIR]
+          openmap tiles <dataset> --bbox <minE,minN,maxE,maxN> [--state by|ni]
+          openmap download <dataset> --bbox <minE,minN,maxE,maxN> [--state by|ni]
+                   [--out DIR] [--parallel N] [--sidecars]
+          openmap height <easting> <northing> [--state by|ni] [--dataset ID] [--cache DIR]
           openmap height --latlon <lat> <lon> [...]
-          openmap profile <fromE> <fromN> <toE> <toN> [--samples N] [--cache DIR]
-          openmap convert --to-utm <lat> <lon>
-          openmap convert --to-latlon <easting> <northing>
+          openmap profile <fromE> <fromN> <toE> <toN> [--state by|ni] [--samples N] [--cache DIR]
+          openmap convert --to-utm <lat> <lon> | --to-latlon <easting> <northing>
+          openmap proxy-test [proxy options]
 
-        Examples (Munich, Marienplatz):
-          openmap convert --to-utm 48.137222 11.575556
-          openmap height --latlon 48.137222 11.575556
-          openmap download dgm1 --bbox 691000,5334000,692000,5335000 --out downloads
+        Elevation datasets: by: dgm1 (default), dgm5, dom20 | ni: dgm1 (default), dom1
 
-        Data: Bayerische Vermessungsverwaltung, CC BY 4.0 (www.geodaten.bayern.de)
+        Proxy options (all commands; mirror the Python Unifier's proxy manager):
+          --proxy URL             explicit proxy, e.g. http://proxy.company.com:8080
+                                  (omit to auto-use HTTPS_PROXY/HTTP_PROXY env vars)
+          --proxy-user U --proxy-pass P     Basic auth credentials
+          --proxy-domain DOMAIN   switches auth to NTLM with this Windows domain
+          --no-proxy LIST         comma-separated bypass hosts
+          --ca-bundle FILE.pem    custom CA bundle (TLS-inspecting proxies)
+          --no-ssl-verify         disable TLS verification (dev only)
+
+        Examples:
+          openmap height --latlon 48.137222 11.575556                 # Munich (Bayern)
+          openmap height --latlon 52.374 9.738 --state ni             # Hannover (Niedersachsen)
+          openmap download dgm1 --state ni --bbox 550000,5802000,551000,5803000
+
+        Data: Bayerische Vermessungsverwaltung & LGLN Niedersachsen — CC BY 4.0
         """);
     return 0;
 }
 
 static int Datasets()
 {
+    Console.WriteLine("Bayern (--state by):");
     foreach (var d in BayernCatalog.Instance.Datasets.Values)
-    {
-        Console.WriteLine($"{d.Id,-14} [{d.Category}] {d.Label}");
-        Console.WriteLine($"{"",-14} {d.Description}");
-    }
+        Console.WriteLine($"  {d.Id,-12} [{d.Category}] {d.Label}");
+    Console.WriteLine();
+    Console.WriteLine("Niedersachsen (--state ni):");
+    foreach (var d in NiedersachsenCatalog.Datasets.Values)
+        Console.WriteLine($"  {d.Id,-12} [{d.Category}] {d.Label}");
     return 0;
 }
 
-static int Tiles(string[] args)
+static async Task<int> Tiles(string[] args)
 {
     var dataset = Require(args, 1, "dataset id");
     var bbox = ParseBbox(GetOption(args, "--bbox") ?? throw new ArgumentException("--bbox is required."));
-    var source = new BayernTileSource();
-    var jobs = source.JobsFor(dataset, bbox).ToList();
-    foreach (var job in jobs)
-        Console.WriteLine($"{job.FileName}  {job.Mirrors[0]}");
-    Console.WriteLine($"{jobs.Count} tiles, ~{source.EstimateSizeMb(dataset, bbox):F0} MB");
+
+    if (IsNiedersachsen(args))
+    {
+        using var source = new NiedersachsenTileSource(new StacClient(proxy: ParseProxy(args)));
+        var jobs = await source.JobsForAsync(dataset, bbox);
+        foreach (var job in jobs)
+            Console.WriteLine($"{job.FileName}  {job.Mirrors[0]}");
+        Console.WriteLine($"{jobs.Count} tiles (newest flight per tile, via STAC)");
+    }
+    else
+    {
+        var source = new BayernTileSource();
+        var jobs = source.JobsFor(dataset, bbox).ToList();
+        foreach (var job in jobs)
+            Console.WriteLine($"{job.FileName}  {job.Mirrors[0]}");
+        Console.WriteLine($"{jobs.Count} tiles, ~{source.EstimateSizeMb(dataset, bbox):F0} MB");
+    }
     return 0;
 }
 
@@ -81,15 +111,30 @@ static async Task<int> Download(string[] args)
     var outDir = GetOption(args, "--out") ?? "downloads";
     var parallel = int.Parse(GetOption(args, "--parallel") ?? "4", CultureInfo.InvariantCulture);
     var sidecars = args.Contains("--sidecars");
+    var proxy = ParseProxy(args);
 
-    var catalog = BayernCatalog.Instance;
-    var info = catalog[dataset];
-    var jobs = (info.Kind == DatasetKind.Wms
-        ? new BayernWmsSource().JobsFor(dataset, bbox)
-        : new BayernTileSource().JobsFor(dataset, bbox)).ToList();
+    IReadOnlyList<DownloadJob> jobs;
+    double? pixelSize;
+    string attribution;
+    if (IsNiedersachsen(args))
+    {
+        using var source = new NiedersachsenTileSource(new StacClient(proxy: proxy));
+        jobs = await source.JobsForAsync(dataset, bbox);
+        pixelSize = NiedersachsenCatalog.Get(dataset).PixelSizeMeters;
+        attribution = NiedersachsenCatalog.Attribution;
+    }
+    else
+    {
+        var info = BayernCatalog.Instance[dataset];
+        jobs = (info.Kind == DatasetKind.Wms
+            ? new BayernWmsSource().JobsFor(dataset, bbox)
+            : new BayernTileSource().JobsFor(dataset, bbox)).ToList();
+        pixelSize = info.PixelSizeMeters;
+        attribution = BayernCatalog.Attribution;
+    }
 
     Console.WriteLine($"Downloading {jobs.Count} {dataset} tiles to {outDir} ...");
-    using var downloader = new HttpTileDownloader(new DownloaderOptions { MaxParallel = parallel });
+    using var downloader = new HttpTileDownloader(new DownloaderOptions { MaxParallel = parallel, Proxy = proxy });
     var progress = new Progress<DownloadProgress>(p =>
     {
         if (p.Status is "Completed" or "Skipped (exists)")
@@ -101,28 +146,30 @@ static async Task<int> Download(string[] args)
     foreach (var r in results.Where(r => !r.Success))
         Console.Error.WriteLine($"  FAILED {r.Job.FileName}: {r.Error}");
 
-    if (sidecars && info.PixelSizeMeters is { } px)
+    if (sidecars && pixelSize is { } px)
         foreach (var r in results.Where(r => r.Success && r.LocalPath is not null))
             WorldFile.WriteSidecarsForBayernTile(r.LocalPath!, px);
 
     Console.WriteLine($"{ok}/{results.Count} tiles OK.");
-    Console.WriteLine(BayernCatalog.Attribution);
+    Console.WriteLine(attribution);
     return ok == results.Count ? 0 : 1;
 }
 
 static async Task<int> Height(string[] args)
 {
     var point = ParsePosition(args);
+    var ni = IsNiedersachsen(args);
     var dataset = GetOption(args, "--dataset") ?? "dgm1";
     var cache = GetOption(args, "--cache") ?? "tilecache";
+    var proxy = ParseProxy(args);
 
-    using var provider = CreateProvider(dataset, cache);
+    using var provider = CreateProvider(ni, dataset, cache, proxy);
     var elevation = await provider.GetElevationAsync(point);
     var geo = Etrs89Utm32Transform.Instance.ToGeo(point);
     Console.WriteLine($"Position: {point}  ({geo})");
     Console.WriteLine(elevation is null
-        ? "Elevation: no data (outside Bavaria or NoData cell)"
-        : FormattableString.Invariant($"Elevation: {elevation:F2} m ({dataset})"));
+        ? $"Elevation: no data (outside {(ni ? "Niedersachsen" : "Bavaria")} or NoData cell)"
+        : FormattableString.Invariant($"Elevation: {elevation:F2} m ({dataset}, {(ni ? "ni" : "by")})"));
 
     var slopeAspect = await provider.GetSlopeAspectAsync(point);
     if (slopeAspect is { } sa)
@@ -139,7 +186,7 @@ static async Task<int> Profile(string[] args)
     var samples = int.Parse(GetOption(args, "--samples") ?? "50", CultureInfo.InvariantCulture);
     var cache = GetOption(args, "--cache") ?? "tilecache";
 
-    using var provider = BayernElevation.CreateDgm1Provider(cache);
+    using var provider = CreateProvider(IsNiedersachsen(args), "dgm1", cache, ParseProxy(args));
     var profile = await provider.GetProfileAsync(from, to, samples);
     var distance = 0.0;
     Utm32Point? prev = null;
@@ -171,13 +218,71 @@ static int Convert_(string[] args)
     throw new ArgumentException("Use: convert --to-utm <lat> <lon>  OR  convert --to-latlon <E> <N>.");
 }
 
-static TiledElevationProvider CreateProvider(string dataset, string cache) => dataset.ToLowerInvariant() switch
+static async Task<int> ProxyTest(string[] args)
 {
-    "dgm1" => BayernElevation.CreateDgm1Provider(cache),
-    "dgm5" => BayernElevation.CreateDgm5Provider(cache),
-    "dom20" => BayernElevation.CreateDom20Provider(cache),
-    _ => throw new ArgumentException($"'{dataset}' is not an elevation dataset (use dgm1, dgm5, or dom20)."),
-};
+    var proxy = ParseProxy(args) ?? new ProxyManager();
+    if (!proxy.Config.Enabled)
+    {
+        proxy.AutoDetect();
+        Console.WriteLine(proxy.LastDetectMessage);
+    }
+    Console.WriteLine(proxy.Diagnose());
+    var results = await proxy.TestConnectionsAsync();
+    var allOk = true;
+    foreach (var (label, (ok, message)) in results)
+    {
+        Console.WriteLine($"  {(ok ? "OK  " : "FAIL")} {label}: {message}");
+        allOk &= ok;
+    }
+    return allOk ? 0 : 1;
+}
+
+static TiledElevationProvider CreateProvider(bool ni, string dataset, string cache, ProxyManager? proxy)
+{
+    var downloader = new HttpTileDownloader(new DownloaderOptions { Proxy = proxy });
+    return (ni, dataset.ToLowerInvariant()) switch
+    {
+        (true, "dgm1") => NiedersachsenElevation.CreateDgm1Provider(cache, downloader, proxy),
+        (true, "dom1") => NiedersachsenElevation.CreateDom1Provider(cache, downloader, proxy),
+        (false, "dgm1") => BayernElevation.CreateDgm1Provider(cache, downloader),
+        (false, "dgm5") => BayernElevation.CreateDgm5Provider(cache, downloader),
+        (false, "dom20") => BayernElevation.CreateDom20Provider(cache, downloader),
+        _ => throw new ArgumentException(
+            $"'{dataset}' is not an elevation dataset for this state (by: dgm1/dgm5/dom20, ni: dgm1/dom1)."),
+    };
+}
+
+static bool IsNiedersachsen(string[] args) =>
+    (GetOption(args, "--state") ?? "by").ToLowerInvariant() switch
+    {
+        "by" or "bayern" => false,
+        "ni" or "niedersachsen" => true,
+        var s => throw new ArgumentException($"Unknown state '{s}' (use by or ni)."),
+    };
+
+static ProxyManager? ParseProxy(string[] args)
+{
+    var url = GetOption(args, "--proxy");
+    var caBundle = GetOption(args, "--ca-bundle");
+    var noSslVerify = args.Contains("--no-ssl-verify");
+    if (url is null && caBundle is null && !noSslVerify)
+        return null; // default: HttpClient's env-based proxy behavior
+
+    var manager = new ProxyManager();
+    if (url is not null)
+    {
+        var user = GetOption(args, "--proxy-user") ?? "";
+        var pass = GetOption(args, "--proxy-pass") ?? "";
+        var domain = GetOption(args, "--proxy-domain") ?? "";
+        var auth = user.Length == 0 ? ProxyAuthType.None
+            : domain.Length > 0 ? ProxyAuthType.Ntlm : ProxyAuthType.Basic;
+        manager.SetManualProxy(url, auth, user, pass, domain);
+        if (GetOption(args, "--no-proxy") is { } bypass)
+            manager.Config.NoProxy = bypass;
+    }
+    manager.SetSsl(!noSslVerify, caBundle ?? "");
+    return manager;
+}
 
 static Utm32Point ParsePosition(string[] args)
 {
