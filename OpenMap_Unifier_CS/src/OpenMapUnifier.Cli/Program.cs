@@ -57,6 +57,7 @@ static int Help()
           openmap convert <x> <y> --from <epsg> --to <epsg>
           openmap detect <a> <b>            what CRS is this pair? ranked guesses + all conversions
           openmap import-json <file> [--to <epsg>] [--out <file.geojson>]
+                   [--assume-epsg <epsg>] [--min-confidence 0.6] [--region germany|central-europe]
                                             recover coordinates from messy JSON, any format mix
           openmap proxy-test [proxy options]
 
@@ -307,7 +308,20 @@ static int ImportJson(string[] args)
     var file = Require(args, 1, "JSON file path");
     var targetEpsg = int.Parse(GetOption(args, "--to") ?? "25832", CultureInfo.InvariantCulture);
 
-    var found = OpenMapUnifier.Core.Import.ChaoticJsonImporter.ScanFile(file);
+    var options = new OpenMapUnifier.Core.Import.ImportOptions();
+    if (GetOption(args, "--assume-epsg") is { } assume)
+        options.AssumeEpsg = int.Parse(assume, CultureInfo.InvariantCulture);
+    if (GetOption(args, "--min-confidence") is { } minConf)
+        options.MinConfidence = ParseDouble(minConf);
+    if (GetOption(args, "--region") is { } region)
+        options.Region = region.ToLowerInvariant() switch
+        {
+            "germany" => DetectionRegion.Germany,
+            "central-europe" => DetectionRegion.CentralEurope,
+            _ => throw new ArgumentException("--region must be germany or central-europe."),
+        };
+
+    var found = OpenMapUnifier.Core.Import.ChaoticJsonImporter.ScanFile(file, options);
     if (found.Count == 0)
     {
         Console.WriteLine("No coordinates recognized in this JSON.");
@@ -327,41 +341,7 @@ static int ImportJson(string[] args)
 
     if (GetOption(args, "--out") is { } outPath)
     {
-        // Normalized GeoJSON (WGS84 per spec) with provenance properties.
-        using var ms = new MemoryStream();
-        using (var w = new System.Text.Json.Utf8JsonWriter(ms, new System.Text.Json.JsonWriterOptions { Indented = true }))
-        {
-            w.WriteStartObject();
-            w.WriteString("type", "FeatureCollection");
-            w.WriteStartArray("features");
-            foreach (var f in found)
-            {
-                w.WriteStartObject();
-                w.WriteString("type", "Feature");
-                w.WriteStartObject("geometry");
-                w.WriteString("type", "Point");
-                w.WriteStartArray("coordinates");
-                w.WriteNumberValue(Math.Round(f.Geo.Longitude, 8));
-                w.WriteNumberValue(Math.Round(f.Geo.Latitude, 8));
-                if (f.Z is { } z) w.WriteNumberValue(Math.Round(z, 3));
-                w.WriteEndArray();
-                w.WriteEndObject();
-                w.WriteStartObject("properties");
-                w.WriteString("sourcePath", f.Path);
-                w.WriteString("sourceRaw", f.Raw);
-                w.WriteNumber("detectedEpsg", f.Guess.Epsg);
-                w.WriteString("detectedCrs", f.Guess.CrsName);
-                w.WriteNumber("confidence", Math.Round(f.Guess.Confidence, 3));
-                var (tx, ty) = f.In(targetEpsg);
-                w.WriteNumber($"epsg{targetEpsg}_x", Math.Round(tx, 3));
-                w.WriteNumber($"epsg{targetEpsg}_y", Math.Round(ty, 3));
-                w.WriteEndObject();
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-            w.WriteEndObject();
-        }
-        File.WriteAllBytes(outPath, ms.ToArray());
+        OpenMapUnifier.Core.Import.NormalizedGeoJson.WriteFile(outPath, found, targetEpsg);
         Console.WriteLine($"Normalized GeoJSON written to {outPath}");
     }
     return 0;

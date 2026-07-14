@@ -32,6 +32,12 @@ every state because each provider carries its own transform. Where a state
 only publishes multi-GB archives (HH/HB/SL/HE), single 1 km tiles are
 range-extracted remotely — no full downloads.
 
+**Detailed guides** live in [`docs/`](docs/): [conversions](docs/conversions.md)
+(every CRS, axis-order conventions, the math, accuracy),
+[chaotic-JSON import](docs/json-import.md), [proxy/TLS setup](docs/proxy.md),
+and [architecture](docs/architecture.md) (interfaces, per-state mechanisms,
+extension recipes).
+
 ## Layout
 
 ```

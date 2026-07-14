@@ -194,6 +194,57 @@ public class ConversionSuiteTests
         Assert.Null(CoordinateDetector.DetectBest(1e9, -4));
     }
 
+    // ---- Import options -------------------------------------------------------------
+
+    [Fact]
+    public void ImportOptions_AssumeEpsg_PinsPlanarPairs()
+    {
+        // 445607/5547602 fits BOTH zone 32 and 33 by range — with AssumeEpsg
+        // there is no guessing.
+        const string json = """{ "pt": { "x": 445607.4, "y": 5547602.1 } }""";
+        var options = new ImportOptions { AssumeEpsg = 25832 };
+        var found = ChaoticJsonImporter.Scan(json, options);
+
+        var f = Assert.Single(found);
+        Assert.Equal(25832, f.Guess.Epsg);
+        Assert.Contains("configured EPSG:25832", f.Guess.Reason);
+        Assert.Equal(50.078, f.Geo.Latitude, 2); // Wiesbaden
+    }
+
+    [Fact]
+    public void ImportOptions_AssumeEpsg_FallsBackWhenImpossible()
+    {
+        // Named lat/lon fields stay geographic even when planar is assumed.
+        const string json = """{ "pt": { "lat": 48.137222, "lon": 11.575556 } }""";
+        var found = ChaoticJsonImporter.Scan(json, new ImportOptions { AssumeEpsg = 31468 });
+        Assert.Equal(4326, Assert.Single(found).Guess.Epsg);
+    }
+
+    [Fact]
+    public void ImportOptions_CustomKeys_AreRecognized()
+    {
+        const string json = """{ "pos": { "east_m": 691607.86, "north_m": 5334760.39 } }""";
+        Assert.Empty(ChaoticJsonImporter.Scan(json)); // unknown names by default
+
+        var options = new ImportOptions();
+        options.XKeys.Add("east_m");
+        options.YKeys.Add("north_m");
+        var found = ChaoticJsonImporter.Scan(json, options);
+        Assert.Equal(48.137, Assert.Single(found).Geo.Latitude, 2);
+    }
+
+    [Fact]
+    public void ImportOptions_Region_WidensDetection()
+    {
+        // Warsaw — outside the Germany scoring box, inside Central Europe.
+        const string json = """{ "warszawa": [21.0122, 52.2297] }""";
+        Assert.Empty(ChaoticJsonImporter.Scan(json));
+
+        var found = ChaoticJsonImporter.Scan(json,
+            new ImportOptions { Region = DetectionRegion.CentralEurope });
+        Assert.Equal(52.230, Assert.Single(found).Geo.Latitude, 2);
+    }
+
     // ---- Chaotic JSON importer ----------------------------------------------------------
 
     [Fact]

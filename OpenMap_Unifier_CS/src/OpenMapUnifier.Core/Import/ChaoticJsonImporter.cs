@@ -30,10 +30,12 @@ public sealed record FoundCoordinate(
 /// "lat, lon" text,</item>
 /// <item>z/alt/height/hoehe/ele siblings as elevation.</item>
 /// </list>
-/// Planar values run through <see cref="CoordinateDetector"/>, so UTM32/33,
-/// Gauß-Krüger, zone-prefixed and Web-Mercator inputs are told apart by where
-/// they land. Every find reports its JSON path, what was matched, the ranked
-/// best interpretation and its confidence — check low-confidence rows by hand.
+/// Planar values run through <see cref="CoordinateDetector"/> (or are pinned
+/// to <see cref="ImportOptions.AssumeEpsg"/>), so UTM32/33, Gauß-Krüger,
+/// zone-prefixed and Web-Mercator inputs are told apart by where they land.
+/// Every find reports its JSON path, what was matched, the best
+/// interpretation and its confidence — check low-confidence rows by hand.
+/// See docs/json-import.md for the full guide.
 /// </summary>
 public static class ChaoticJsonImporter
 {
@@ -43,50 +45,52 @@ public static class ChaoticJsonImporter
     private static readonly string[] YKeys = { "y", "n", "north", "northing", "hochwert", "hw", "nordwert", "utm_y", "utm_n" };
     private static readonly string[] ZKeys = { "z", "alt", "altitude", "height", "hoehe", "höhe", "ele", "elevation" };
 
-    public static IReadOnlyList<FoundCoordinate> ScanFile(string path) =>
-        Scan(File.ReadAllText(path));
+    public static IReadOnlyList<FoundCoordinate> ScanFile(string path, ImportOptions? options = null) =>
+        Scan(File.ReadAllText(path), options);
 
-    public static IReadOnlyList<FoundCoordinate> Scan(string json)
+    public static IReadOnlyList<FoundCoordinate> Scan(string json, ImportOptions? options = null)
     {
+        options ??= ImportOptions.Default;
         using var doc = JsonDocument.Parse(json, new JsonDocumentOptions
         {
             AllowTrailingCommas = true,
             CommentHandling = JsonCommentHandling.Skip,
         });
         var found = new List<FoundCoordinate>();
-        Walk(doc.RootElement, "$", found);
+        Walk(doc.RootElement, "$", found, options);
         return found;
     }
 
-    private static void Walk(JsonElement element, string path, List<FoundCoordinate> found)
+    private static void Walk(JsonElement element, string path, List<FoundCoordinate> found,
+        ImportOptions options)
     {
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
-                if (TryNamedPair(element, path, found, out var consumedKeys))
+                if (TryNamedPair(element, path, found, options, out var consumedKeys))
                 {
                     foreach (var prop in element.EnumerateObject())
                         if (!consumedKeys.Contains(prop.Name))
-                            Walk(prop.Value, $"{path}.{prop.Name}", found);
+                            Walk(prop.Value, $"{path}.{prop.Name}", found, options);
                 }
                 else
                 {
                     foreach (var prop in element.EnumerateObject())
-                        Walk(prop.Value, $"{path}.{prop.Name}", found);
+                        Walk(prop.Value, $"{path}.{prop.Name}", found, options);
                 }
                 break;
 
             case JsonValueKind.Array:
-                if (!TryNumericArray(element, path, found))
+                if (!TryNumericArray(element, path, found, options))
                 {
                     var i = 0;
                     foreach (var item in element.EnumerateArray())
-                        Walk(item, $"{path}[{i++}]", found);
+                        Walk(item, $"{path}[{i++}]", found, options);
                 }
                 break;
 
             case JsonValueKind.String:
-                TryCoordinateString(element.GetString()!, path, found);
+                TryCoordinateString(element.GetString()!, path, found, options);
                 break;
         }
     }
@@ -94,7 +98,7 @@ public static class ChaoticJsonImporter
     // ---- named object pairs ---------------------------------------------------
 
     private static bool TryNamedPair(JsonElement obj, string path, List<FoundCoordinate> found,
-        out HashSet<string> consumed)
+        ImportOptions options, out HashSet<string> consumed)
     {
         consumed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         double? lat = null, lon = null, x = null, y = null, z = null;
@@ -104,11 +108,11 @@ public static class ChaoticJsonImporter
         {
             if (!TryNumber(prop.Value, out var value)) continue;
             var name = prop.Name.Trim().ToLowerInvariant();
-            if (LatKeys.Contains(name)) { lat = value; latKey = prop.Name; }
-            else if (LonKeys.Contains(name)) { lon = value; lonKey = prop.Name; }
-            else if (XKeys.Contains(name)) { x = value; xKey = prop.Name; }
-            else if (YKeys.Contains(name)) { y = value; yKey = prop.Name; }
-            else if (ZKeys.Contains(name)) z = value;
+            if (Matches(name, LatKeys, options.LatitudeKeys)) { lat = value; latKey = prop.Name; }
+            else if (Matches(name, LonKeys, options.LongitudeKeys)) { lon = value; lonKey = prop.Name; }
+            else if (Matches(name, XKeys, options.XKeys)) { x = value; xKey = prop.Name; }
+            else if (Matches(name, YKeys, options.YKeys)) { y = value; yKey = prop.Name; }
+            else if (Matches(name, ZKeys, options.ZKeys)) z = value;
         }
 
         if (lat is { } la && lon is { } lo)
@@ -117,7 +121,7 @@ public static class ChaoticJsonImporter
             var guess = Math.Abs(la) <= 90 && Math.Abs(lo) <= 180
                 ? new CoordinateGuess(4326, CrsRegistry.Get(4326).Name, new GeoPoint(la, lo), 0.95,
                     $"named fields '{latKey}'/'{lonKey}'")
-                : CoordinateDetector.DetectBest(la, lo);
+                : BestPlanar(la, lo, options);
             if (guess is not null)
             {
                 found.Add(new FoundCoordinate(path, Raw(la, lo), guess, z));
@@ -128,10 +132,10 @@ public static class ChaoticJsonImporter
 
         if (x is { } px && y is { } py)
         {
-            var guess = CoordinateDetector.DetectBest(px, py);
+            var guess = BestPlanar(px, py, options);
             // Named x/y can be anything (local/scene coords too) — only accept
             // interpretations that actually land somewhere plausible.
-            if (guess is { Confidence: >= 0.5 })
+            if (guess is not null && guess.Confidence >= options.MinNamedConfidence)
             {
                 found.Add(new FoundCoordinate(path, Raw(px, py),
                     guess with { Reason = $"named fields '{xKey}'/'{yKey}'; {guess.Reason}" }, z));
@@ -140,11 +144,15 @@ public static class ChaoticJsonImporter
             }
         }
         return false;
+
+        static bool Matches(string name, string[] builtIn, List<string> extra) =>
+            builtIn.Contains(name) || extra.Contains(name, StringComparer.OrdinalIgnoreCase);
     }
 
     // ---- bare numeric arrays ----------------------------------------------------
 
-    private static bool TryNumericArray(JsonElement array, string path, List<FoundCoordinate> found)
+    private static bool TryNumericArray(JsonElement array, string path, List<FoundCoordinate> found,
+        ImportOptions options)
     {
         var length = array.GetArrayLength();
         if (length is < 2 or > 3) return false;
@@ -161,8 +169,8 @@ public static class ChaoticJsonImporter
         // planar interpretations, ranking by where the result lands. Bare
         // arrays carry no naming hint, so demand solid confidence — otherwise
         // every [1, 2] in the document would masquerade as a coordinate.
-        var guess = CoordinateDetector.DetectBest(values[0], values[1]);
-        if (guess is not { Confidence: >= 0.6 }) return false;
+        var guess = BestPlanar(values[0], values[1], options);
+        if (guess is null || guess.Confidence < options.MinConfidence) return false;
         found.Add(new FoundCoordinate(path, Raw(values[0], values[1]), guess,
             length == 3 ? values[2] : null));
         return true;
@@ -170,7 +178,8 @@ public static class ChaoticJsonImporter
 
     // ---- coordinate strings --------------------------------------------------------
 
-    private static void TryCoordinateString(string text, string path, List<FoundCoordinate> found)
+    private static void TryCoordinateString(string text, string path, List<FoundCoordinate> found,
+        ImportOptions options)
     {
         if (text.Length is < 3 or > 200) return;
 
@@ -188,8 +197,8 @@ public static class ChaoticJsonImporter
         if (parts.Length is 2 or 3 &&
             TryParse(parts[0], out var a) && TryParse(parts[1], out var b))
         {
-            var guess = CoordinateDetector.DetectBest(a, b);
-            if (guess is { Confidence: >= 0.6 })
+            var guess = BestPlanar(a, b, options);
+            if (guess is not null && guess.Confidence >= options.MinConfidence)
             {
                 double? z = parts.Length == 3 && TryParse(parts[2], out var pz) ? pz : null;
                 found.Add(new FoundCoordinate(path, text.Trim(), guess, z));
@@ -198,6 +207,15 @@ public static class ChaoticJsonImporter
     }
 
     // ---- helpers -------------------------------------------------------------------
+
+    /// <summary>AssumeEpsg pins planar pairs to a known CRS; detection is the fallback.</summary>
+    private static CoordinateGuess? BestPlanar(double a, double b, ImportOptions options)
+    {
+        if (options.AssumeEpsg is { } epsg &&
+            CoordinateDetector.Interpret(a, b, epsg, options.Region) is { } pinned)
+            return pinned;
+        return CoordinateDetector.DetectBest(a, b, options.Region);
+    }
 
     private static bool TryNumber(JsonElement element, out double value)
     {
