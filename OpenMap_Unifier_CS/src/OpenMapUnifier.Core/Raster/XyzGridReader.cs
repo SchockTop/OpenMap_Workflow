@@ -10,16 +10,23 @@ namespace OpenMapUnifier.Core.Raster;
 /// </summary>
 public static class XyzGridReader
 {
-    public static HeightGrid ReadZip(string zipPath, float noDataValue = -9999f)
+    public static HeightGrid ReadZip(string zipPath, float noDataValue = -9999f,
+        Func<string, bool>? entryFilter = null)
     {
         using var archive = ZipFile.OpenRead(zipPath);
-        var entry = archive.Entries.FirstOrDefault(e =>
+        var candidates = entryFilter is null
+            ? archive.Entries.AsEnumerable()
+            : archive.Entries.Where(e => entryFilter(e.FullName));
+        var entry = candidates.FirstOrDefault(e =>
                         e.Name.EndsWith(".xyz", StringComparison.OrdinalIgnoreCase))
-                    ?? archive.Entries.FirstOrDefault(e => e.Length > 0)
-                    ?? throw new InvalidDataException($"No data entry in {zipPath}.");
+                    ?? candidates.FirstOrDefault(e => e.Length > 0)
+                    ?? throw new InvalidDataException($"No matching data entry in {zipPath}.");
         using var stream = entry.Open();
         return Read(stream, noDataValue);
     }
+
+    public static HeightGrid Read(byte[] xyzContent, float noDataValue = -9999f) =>
+        Read(new MemoryStream(xyzContent), noDataValue);
 
     public static HeightGrid Read(Stream stream, float noDataValue = -9999f)
     {

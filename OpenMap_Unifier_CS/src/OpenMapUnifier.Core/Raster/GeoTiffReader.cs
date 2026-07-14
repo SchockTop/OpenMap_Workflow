@@ -142,26 +142,36 @@ public static class GeoTiffReader
         {
             case 1:
                 return;
-            case 2: // horizontal differencing on integer samples
+            case 2: // horizontal differencing over the raw integer lanes.
+                    // libtiff applies this to 32-bit lanes even for float32
+                    // data (wrapping u32 addition) — Brandenburg's and RLP's
+                    // DGM1 tiles are written exactly that way.
                 for (var r = 0; r < rows; r++)
                 {
                     var row = data.Slice(r * width * bytesPerSample, width * bytesPerSample);
-                    if (bytesPerSample == 1)
+                    switch (bytesPerSample)
                     {
-                        for (var c = 1; c < width; c++) row[c] += row[c - 1];
-                    }
-                    else if (bytesPerSample == 2)
-                    {
-                        for (var c = 1; c < width; c++)
-                        {
-                            var prev = BinaryPrimitives.ReadUInt16LittleEndian(row[((c - 1) * 2)..]);
-                            var cur = BinaryPrimitives.ReadUInt16LittleEndian(row[(c * 2)..]);
-                            BinaryPrimitives.WriteUInt16LittleEndian(row[(c * 2)..], (ushort)(cur + prev));
-                        }
-                    }
-                    else
-                    {
-                        throw new NotSupportedException("Predictor 2 with 32-bit samples is not supported.");
+                        case 1:
+                            for (var c = 1; c < width; c++) row[c] += row[c - 1];
+                            break;
+                        case 2:
+                            for (var c = 1; c < width; c++)
+                            {
+                                var prev = BinaryPrimitives.ReadUInt16LittleEndian(row[((c - 1) * 2)..]);
+                                var cur = BinaryPrimitives.ReadUInt16LittleEndian(row[(c * 2)..]);
+                                BinaryPrimitives.WriteUInt16LittleEndian(row[(c * 2)..], (ushort)(cur + prev));
+                            }
+                            break;
+                        case 4:
+                            for (var c = 1; c < width; c++)
+                            {
+                                var prev = BinaryPrimitives.ReadUInt32LittleEndian(row[((c - 1) * 4)..]);
+                                var cur = BinaryPrimitives.ReadUInt32LittleEndian(row[(c * 4)..]);
+                                BinaryPrimitives.WriteUInt32LittleEndian(row[(c * 4)..], unchecked(cur + prev));
+                            }
+                            break;
+                        default:
+                            throw new NotSupportedException($"Predictor 2 with {bytesPerSample * 8}-bit samples.");
                     }
                 }
                 return;

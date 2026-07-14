@@ -11,5 +11,6 @@
     <ProjectReference Include="../../src/OpenMapUnifier.Core/OpenMapUnifier.Core.csproj" />
     <ProjectReference Include="../../src/OpenMapUnifier.Bayern/OpenMapUnifier.Bayern.csproj" />
     <ProjectReference Include="../../src/OpenMapUnifier.Niedersachsen/OpenMapUnifier.Niedersachsen.csproj" />
+    <ProjectReference Include="../../src/OpenMapUnifier.Germany/OpenMapUnifier.Germany.csproj" />
   </ItemGroup>
 </Project>

@@ -56,14 +56,23 @@ public sealed class TiledElevationProvider : IElevationProvider, IDisposable
 
     private async Task<HeightGrid?> LoadAsync(TileId tile, CancellationToken ct)
     {
-        var job = await _resolver.JobForAsync(tile, ct).ConfigureAwait(false);
-        if (job is null)
-            return null;
-        var result = await _downloader.DownloadAsync(job, CacheDirectory, ct: ct).ConfigureAwait(false);
-        if (!result.Success || result.LocalPath is null)
+        string? localPath;
+        if (_resolver is ITileFetcher fetcher)
+        {
+            localPath = await fetcher.FetchAsync(tile, CacheDirectory, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            var job = await _resolver.JobForAsync(tile, ct).ConfigureAwait(false);
+            if (job is null)
+                return null;
+            var result = await _downloader.DownloadAsync(job, CacheDirectory, ct: ct).ConfigureAwait(false);
+            localPath = result.Success ? result.LocalPath : null;
+        }
+        if (localPath is null)
             return null;
 
-        var grid = _resolver.Parse(result.LocalPath, tile);
+        var grid = _resolver.Parse(localPath, tile);
         _lru.Enqueue(tile);
         while (_lru.Count > _maxCachedGrids && _lru.TryDequeue(out var evict))
             if (!evict.Equals(tile))

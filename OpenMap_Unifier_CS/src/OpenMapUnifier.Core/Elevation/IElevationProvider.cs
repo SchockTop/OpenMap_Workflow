@@ -38,3 +38,17 @@ public interface IHeightTileResolver
     Task<DownloadJob?> JobForAsync(TileId tile, CancellationToken ct = default);
     HeightGrid Parse(string localPath, TileId tile);
 }
+
+/// <summary>
+/// Optional companion to <see cref="IHeightTileResolver"/> for sources with no
+/// per-tile URL at all — Hamburg, Bremen and Saarland only publish multi-GB
+/// archives, from which a tile is extracted via HTTP range requests. When a
+/// resolver implements this, <see cref="TiledElevationProvider"/> calls
+/// FetchAsync instead of the JobForAsync/download flow. Return the local file
+/// path (should live under <paramref name="cacheDirectory"/>; skip work when
+/// it already exists), or null when the tile has no coverage.
+/// </summary>
+public interface ITileFetcher
+{
+    Task<string?> FetchAsync(TileId tile, string cacheDirectory, CancellationToken ct = default);
+}

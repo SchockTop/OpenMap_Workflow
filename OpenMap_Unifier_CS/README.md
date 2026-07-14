@@ -4,33 +4,49 @@ C# implementation of the OpenMap_Unifier download engine: fetches German
 OpenData geodata tiles and answers terrain queries — "what's the height at
 this position?" — with zero external dependencies (pure .NET 8 BCL).
 
-Supported states:
+**All 16 Bundesländer are supported.** Every state's endpoints were verified
+live (July 2026) and every state's DGM1 height query was tested end-to-end
+against a real city coordinate:
 
-- **Bayern (LDBV)**: DGM1/DGM5 terrain, DOM20 surface, DOP20/40 orthophotos,
-  LoD2 buildings, LiDAR, WMS renders — static bayernwolke tile URLs.
-- **Niedersachsen (LGLN OpenGeoData)**: DGM1 terrain, DOM1 surface, DOP
-  RGB/RGBI orthophotos — resolved through LGLN's STAC APIs
-  (`dgm|dom|dop.stac.lgln.niedersachsen.de`), because the S3 download URLs
-  embed acquisition batch and flight date and cannot be computed from the
-  grid. Where a tile was flown multiple times, the newest epoch wins.
+| Code | State | CRS | DGM1 mechanism | License |
+|---|---|---|---|---|
+| by | Bayern | 25832 | static bayernwolke tile URLs | CC BY 4.0 |
+| ni | Niedersachsen | 25832 | STAC API → S3 COGs | CC BY 4.0 |
+| nw | Nordrhein-Westfalen | 25832 | XML index → GeoTIFF (per-tile year) | DL-DE Zero 2.0 |
+| he | Hessen | 25832 | REST walk → remote-zip extraction | DL-DE Zero 2.0 |
+| bw | Baden-Württemberg | 25832 | 2 km zips (odd-E/even-N cells), XYZ | DL-DE/BY 2.0 |
+| rp | Rheinland-Pfalz | 25832 | ATOM index → GeoTIFF (per-tile year) | DL-DE/BY 2.0 |
+| sl | Saarland | 25832 | Nextcloud share → remote-zip extraction | DL-DE/BY 2.0 |
+| th | Thüringen | 25832 | static zips (epoch fallback as mirror) | DL-DE/BY 2.0 |
+| sh | Schleswig-Holstein | 25832 | overview.php GeoJSON → massen.php, XYZ | CC BY 4.0 |
+| hh | Hamburg | 25832 | CKAN → remote-zip extraction | DL-DE/BY 2.0 |
+| hb | Bremen | 25832 | static city archives → remote-zip, XYZ | CC BY 4.0 |
+| st | Sachsen-Anhalt | 25832 | page-scraped grid + 2-step prepare API | DL-DE/BY 2.0 |
+| be | Berlin | **25833** | static 2 km zips, XYZ | DL-DE Zero 2.0 |
+| bb | Brandenburg | **25833** | static 1 km zips, GeoTIFF | DL-DE/BY 2.0 |
+| sn | Sachsen | **25833** | Nextcloud share, deterministic names | DL-DE/BY 2.0 |
+| mv | Mecklenburg-Vorpommern | **25833** | ATOM download URLs, GeoTIFF | CC BY 4.0 |
 
-All coordinates are EPSG:25832 (ETRS89 / UTM zone 32N), meters — the same
-convention as the rest of OpenMap_Workflow (both states publish in it).
+Zone-33 states take planar coordinates in EPSG:25833; lat/lon input works for
+every state because each provider carries its own transform. Where a state
+only publishes multi-GB archives (HH/HB/SL/HE), single 1 km tiles are
+range-extracted remotely — no full downloads.
 
 ## Layout
 
 ```
-src/OpenMapUnifier.Core           Generic framework: geodesy, km-grid math, polygon
-                                  selection, downloader, proxy manager, GeoTIFF/XYZ
-                                  readers, elevation
+src/OpenMapUnifier.Core           Generic framework: geodesy (zones 32/33), km-grid math,
+                                  polygon selection, downloader, remote-zip reader, proxy
+                                  manager, GeoTIFF/XYZ readers, elevation
 src/OpenMapUnifier.Bayern         Bayern LDBV: catalog, tile naming, WMS, metalink
 src/OpenMapUnifier.Niedersachsen  LGLN OpenGeoData: STAC client, catalog, resolvers
+src/OpenMapUnifier.Germany        The other 14 states behind one IGermanState interface
 src/OpenMapUnifier.Cli            `openmap` command-line demo
 tests/OpenMapUnifier.Tests        xUnit suite (offline; no network needed)
 ```
 
 State-specific code lives in its own package; `Core` knows nothing about
-either agency. Each seam is an interface, so pieces can be swapped
+any agency. Each seam is an interface, so pieces can be swapped
 independently:
 
 | Interface | Role | Default |
@@ -99,9 +115,13 @@ dotnet run -- convert --to-utm 48.137222 11.575556     # -> E=691607.86 N=533476
 dotnet run -- height --latlon 48.137222 11.575556
 dotnet run -- height 729500.5 5433500.5 --dataset dgm5
 
-# Niedersachsen: same commands, --state ni (Hannover)
-dotnet run -- height --latlon 52.374 9.738 --state ni
-dotnet run -- height 550500.5 5802500.5 --state ni --dataset dom1
+# Any state: same commands, --state CODE (see table above)
+dotnet run -- height --latlon 52.374 9.738 --state ni      # Hannover
+dotnet run -- height --latlon 52.52 13.405 --state be      # Berlin (zone 33)
+dotnet run -- height --latlon 50.9375 6.9603 --state nw    # Köln
+dotnet run -- height --latlon 53.5503 9.992 --state hh     # Hamburg (tile extracted
+                                                           #  from the 1.4 GB city zip)
+dotnet run -- datasets --state sn                          # per-state products + license
 dotnet run -- tiles dop20rgbi --state ni --bbox 550000,5802000,552000,5804000
 
 # Proxy diagnostics (auto-detects HTTPS_PROXY/HTTP_PROXY when no --proxy given)
@@ -156,27 +176,35 @@ var jobs = source.JobsFor("dgm1", polygon);
 
 ## Verified against real data
 
-- Coordinate transform matches pyproj (EPSG:4326→25832) to sub-millimeter.
-- Height sampling matches numpy/tifffile readings of live DGM1 tiles from
-  BOTH states bit-for-bit (Bayern: strip-LZW GeoTIFF; Niedersachsen:
-  tile-organized COG — same reader, different layout paths).
-- Bayern DGM1 (GeoTIFF) and DGM5 (zipped XYZ) agree within centimeters at the
-  same position.
-- Tile naming/URL shapes are pinned by tests to patterns verified live
-  (Bayern: `backend/downloader.py`; Niedersachsen: STAC responses from
-  July 2026).
+- Coordinate transforms match pyproj for BOTH zones (EPSG:4326→25832 and
+  →25833) to sub-millimeter.
+- Height sampling matches numpy/tifffile readings of live DGM1 tiles
+  bit-for-bit (Bayern strip-LZW, Niedersachsen tiled COG, Saarland
+  stored-in-zip, Brandenburg/RLP LZW+floating predictor-2 lanes).
+- All 16 states' DGM1 height queries were run live against a city coordinate
+  during development (Köln 46.5 m, Berlin 35.6 m, Dresden 113.3 m, Hamburg
+  5.6 m, Stuttgart 249.6 m, ...); tile naming and URL shapes are pinned by
+  offline tests.
 
-Niedersachsen notes:
+Per-state quirks worth knowing (all handled internally):
 
-- Elevation COGs are float32 LZW with NoData `-9999`, like Bayern.
-- LGLN's `DOP` collection mixes 20 cm and newer 10 cm epochs under the same
-  asset keys; "newest flight per tile" therefore returns 10 cm imagery in
-  reflown regions (see the STAC `bodenpixelgroesse` property per item).
-- No LoD2/DGM5 equivalents are exposed through STAC; LoD2 for Niedersachsen is
-  distributed per municipality, not on the km grid (not ported).
+- **NoData varies**: -9999 in most states, float32 −MAX in Hamburg, absent in
+  MV — always read from the tile's GDAL tag, never assumed.
+- **Grid anchoring varies**: BW's 2 km cells sit at odd-E/even-N km; LoD2
+  grids are 2 km in TH/RP/ST/SN/MV but 1 km in NRW/Berlin/SL/HH.
+- **Hessen has no spatial index** — first height query in a new region scans
+  municipality archives' central directories until the tile is found (can take
+  minutes); results are cached on disk afterwards.
+- **Sachsen-Anhalt** URLs are one-time (a "prepare" API mints them); tile ids
+  are scraped from the product pages' embedded GeoJSON grid.
+- Berlin/Bremen/SH/BW serve DGM1 as ASCII-XYZ (parsed by the XYZ reader);
+  everything else is GeoTIFF.
 
 Not ported (yet): DOM-Mesh SLPK range-fetch cutout, Sentinel-2/WorldCover
 sources, OSM/Overpass, the GUI/web app.
 
-Data: Bayerische Vermessungsverwaltung — CC BY 4.0 — www.geodaten.bayern.de
-Data: LGLN Niedersachsen, OpenGeoData.NI — CC BY 4.0 — opengeodata.lgln.niedersachsen.de
+Data: © the respective state survey agencies (LDBV, LGLN, Geobasis NRW, HVBG,
+LGL-BW, LVermGeoRP, LVGL-SL, GDI-Th, LVermGeo SH, LGV Hamburg, Landesamt
+GeoInformation Bremen, LVermGeo LSA, Geoportal Berlin, LGB, GeoSN, LAiV M-V) —
+licenses per state in the table above. Attribution strings are exposed as
+`Attribution` on every catalog/state.

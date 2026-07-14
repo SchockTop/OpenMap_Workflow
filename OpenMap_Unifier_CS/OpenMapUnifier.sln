@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenMapUnifier.Tests", "tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenMapUnifier.Niedersachsen", "src\OpenMapUnifier.Niedersachsen\OpenMapUnifier.Niedersachsen.csproj", "{B742A51E-D506-4919-99D2-01AEC647E2F9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenMapUnifier.Germany", "src\OpenMapUnifier.Germany\OpenMapUnifier.Germany.csproj", "{86267C14-D0A8-4C7F-99EF-4E0790D5E38B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -46,6 +48,10 @@ Global
 		{B742A51E-D506-4919-99D2-01AEC647E2F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B742A51E-D506-4919-99D2-01AEC647E2F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B742A51E-D506-4919-99D2-01AEC647E2F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86267C14-D0A8-4C7F-99EF-4E0790D5E38B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86267C14-D0A8-4C7F-99EF-4E0790D5E38B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86267C14-D0A8-4C7F-99EF-4E0790D5E38B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86267C14-D0A8-4C7F-99EF-4E0790D5E38B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{9026CF30-19EB-48D0-BE31-64026D00ED92} = {9600BD14-0E72-43E1-A7A8-E952084337A8}
@@ -53,5 +59,6 @@ Global
 		{60AD178F-3609-4A8A-8C74-592FC112D0ED} = {9600BD14-0E72-43E1-A7A8-E952084337A8}
 		{AED6BA39-CFC4-4943-836A-6A350CDA408E} = {E3FB99E9-47AE-48D3-A1D6-34DEAB381896}
 		{B742A51E-D506-4919-99D2-01AEC647E2F9} = {9600BD14-0E72-43E1-A7A8-E952084337A8}
+		{86267C14-D0A8-4C7F-99EF-4E0790D5E38B} = {9600BD14-0E72-43E1-A7A8-E952084337A8}
 	EndGlobalSection
 EndGlobal
