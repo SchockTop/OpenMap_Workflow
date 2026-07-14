@@ -11,7 +11,7 @@ namespace OpenMapUnifier.Core.Grid;
 public static class TileGrid
 {
     /// <summary>The tile containing a position.</summary>
-    public static TileId TileFor(Utm32Point p, int gridKm = 1)
+    public static TileId TileFor(UtmPoint p, int gridKm = 1)
     {
         var step = gridKm * 1000.0;
         var eastKm = (int)(Math.Floor(p.Easting / step) * gridKm);

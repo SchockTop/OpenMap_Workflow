@@ -165,7 +165,7 @@ static async Task<int> Height(string[] args)
 
     using var provider = CreateProvider(ni, dataset, cache, proxy);
     var elevation = await provider.GetElevationAsync(point);
-    var geo = Etrs89Utm32Transform.Instance.ToGeo(point);
+    var geo = Etrs89UtmTransform.Zone32.ToGeo(point);
     Console.WriteLine($"Position: {point}  ({geo})");
     Console.WriteLine(elevation is null
         ? $"Elevation: no data (outside {(ni ? "Niedersachsen" : "Bavaria")} or NoData cell)"
@@ -181,15 +181,15 @@ static async Task<int> Height(string[] args)
 static async Task<int> Profile(string[] args)
 {
     if (args.Length < 5) throw new ArgumentException("profile needs <fromE> <fromN> <toE> <toN>.");
-    var from = new Utm32Point(ParseDouble(args[1]), ParseDouble(args[2]));
-    var to = new Utm32Point(ParseDouble(args[3]), ParseDouble(args[4]));
+    var from = new UtmPoint(ParseDouble(args[1]), ParseDouble(args[2]));
+    var to = new UtmPoint(ParseDouble(args[3]), ParseDouble(args[4]));
     var samples = int.Parse(GetOption(args, "--samples") ?? "50", CultureInfo.InvariantCulture);
     var cache = GetOption(args, "--cache") ?? "tilecache";
 
     using var provider = CreateProvider(IsNiedersachsen(args), "dgm1", cache, ParseProxy(args));
     var profile = await provider.GetProfileAsync(from, to, samples);
     var distance = 0.0;
-    Utm32Point? prev = null;
+    UtmPoint? prev = null;
     foreach (var (p, h) in profile)
     {
         if (prev is { } q) distance += q.DistanceTo(p);
@@ -202,16 +202,16 @@ static async Task<int> Profile(string[] args)
 
 static int Convert_(string[] args)
 {
-    var t = Etrs89Utm32Transform.Instance;
+    var t = Etrs89UtmTransform.Zone32;
     if (GetOptionIndex(args, "--to-utm") is { } i && args.Length > i + 2)
     {
         var geo = new GeoPoint(ParseDouble(args[i + 1]), ParseDouble(args[i + 2]));
-        Console.WriteLine(t.ToUtm32(geo).ToString());
+        Console.WriteLine(t.ToUtm(geo).ToString());
         return 0;
     }
     if (GetOptionIndex(args, "--to-latlon") is { } j && args.Length > j + 2)
     {
-        var utm = new Utm32Point(ParseDouble(args[j + 1]), ParseDouble(args[j + 2]));
+        var utm = new UtmPoint(ParseDouble(args[j + 1]), ParseDouble(args[j + 2]));
         Console.WriteLine(t.ToGeo(utm).ToString());
         return 0;
     }
@@ -284,15 +284,15 @@ static ProxyManager? ParseProxy(string[] args)
     return manager;
 }
 
-static Utm32Point ParsePosition(string[] args)
+static UtmPoint ParsePosition(string[] args)
 {
     if (GetOptionIndex(args, "--latlon") is { } i && args.Length > i + 2)
     {
         var geo = new GeoPoint(ParseDouble(args[i + 1]), ParseDouble(args[i + 2]));
-        return Etrs89Utm32Transform.Instance.ToUtm32(geo);
+        return Etrs89UtmTransform.Zone32.ToUtm(geo);
     }
     if (args.Length < 3) throw new ArgumentException("height needs <easting> <northing> or --latlon <lat> <lon>.");
-    return new Utm32Point(ParseDouble(args[1]), ParseDouble(args[2]));
+    return new UtmPoint(ParseDouble(args[1]), ParseDouble(args[2]));
 }
 
 static BoundingBox ParseBbox(string s)

@@ -93,7 +93,7 @@ public class DownloadAndElevationTests : IDisposable
     {
         public int ParseCalls;
         public int GridKm => 1;
-        public TileId TileFor(Utm32Point p) => TileGrid.TileFor(p);
+        public TileId TileFor(UtmPoint p) => TileGrid.TileFor(p);
         public Task<DownloadJob?> JobForAsync(TileId tile, CancellationToken ct = default) =>
             Task.FromResult<DownloadJob?>(
                 new DownloadJob($"{tile.Key}.tif", $"https://tiles.example/{tile.Key}.tif"));
@@ -115,9 +115,9 @@ public class DownloadAndElevationTests : IDisposable
         var resolver = new FakeResolver();
         using var provider = new TiledElevationProvider(resolver, _dir, Downloader(handler));
 
-        var p = new Utm32Point(729_500, 5_433_500);
+        var p = new UtmPoint(729_500, 5_433_500);
         var first = await provider.GetElevationAsync(p);
-        var second = await provider.GetElevationAsync(new Utm32Point(729_100, 5_433_900));
+        var second = await provider.GetElevationAsync(new UtmPoint(729_100, 5_433_900));
 
         Assert.Equal(42.0, first);
         Assert.Equal(42.0, second);
@@ -134,7 +134,7 @@ public class DownloadAndElevationTests : IDisposable
         };
         using var provider = new TiledElevationProvider(new FakeResolver(), _dir, Downloader(handler));
 
-        Assert.Null(await provider.GetElevationAsync(new Utm32Point(1_000, 1_000)));
+        Assert.Null(await provider.GetElevationAsync(new UtmPoint(1_000, 1_000)));
     }
 
     public void Dispose() => Directory.Delete(_dir, recursive: true);

@@ -5,9 +5,9 @@ public readonly record struct BoundingBox(double MinEasting, double MinNorthing,
 {
     public double Width => MaxEasting - MinEasting;
     public double Height => MaxNorthing - MinNorthing;
-    public Utm32Point Center => new((MinEasting + MaxEasting) / 2.0, (MinNorthing + MaxNorthing) / 2.0);
+    public UtmPoint Center => new((MinEasting + MaxEasting) / 2.0, (MinNorthing + MaxNorthing) / 2.0);
 
-    public bool Contains(Utm32Point p) =>
+    public bool Contains(UtmPoint p) =>
         p.Easting >= MinEasting && p.Easting <= MaxEasting &&
         p.Northing >= MinNorthing && p.Northing <= MaxNorthing;
 
@@ -16,11 +16,11 @@ public readonly record struct BoundingBox(double MinEasting, double MinNorthing,
         MinNorthing <= other.MaxNorthing && MaxNorthing >= other.MinNorthing;
 
     /// <summary>A square box of <paramref name="radiusMeters"/> around a center point.</summary>
-    public static BoundingBox Around(Utm32Point center, double radiusMeters) =>
+    public static BoundingBox Around(UtmPoint center, double radiusMeters) =>
         new(center.Easting - radiusMeters, center.Northing - radiusMeters,
             center.Easting + radiusMeters, center.Northing + radiusMeters);
 
-    public static BoundingBox FromPoints(IEnumerable<Utm32Point> points)
+    public static BoundingBox FromPoints(IEnumerable<UtmPoint> points)
     {
         double minE = double.PositiveInfinity, minN = double.PositiveInfinity;
         double maxE = double.NegativeInfinity, maxN = double.NegativeInfinity;

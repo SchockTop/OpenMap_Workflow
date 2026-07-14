@@ -12,12 +12,12 @@ namespace OpenMapUnifier.Core.Geometry;
 /// </summary>
 public sealed class Polygon2D
 {
-    private readonly Utm32Point[] _points;
+    private readonly UtmPoint[] _points;
 
-    public IReadOnlyList<Utm32Point> Points => _points;
+    public IReadOnlyList<UtmPoint> Points => _points;
     public BoundingBox Bounds { get; }
 
-    public Polygon2D(IEnumerable<Utm32Point> exteriorRing)
+    public Polygon2D(IEnumerable<UtmPoint> exteriorRing)
     {
         _points = exteriorRing.ToArray();
         if (_points.Length >= 2 && _points[0] == _points[^1])
@@ -34,20 +34,20 @@ public sealed class Polygon2D
     /// </summary>
     public static Polygon2D FromWgs84Wkt(string wkt, ICoordinateTransform? transform = null)
     {
-        transform ??= Etrs89Utm32Transform.Instance;
+        transform ??= Etrs89UtmTransform.Zone32;
         var body = wkt.Contains(';') ? wkt[(wkt.IndexOf(';') + 1)..] : wkt;
         var m = Regex.Match(body, @"POLYGON\s*[Z]?\s*\(\s*\(([^)]*)\)", RegexOptions.IgnoreCase);
         if (!m.Success)
             throw new FormatException("Not a WKT POLYGON: " + wkt[..Math.Min(60, wkt.Length)]);
 
-        var points = new List<Utm32Point>();
+        var points = new List<UtmPoint>();
         foreach (var pair in m.Groups[1].Value.Split(','))
         {
             var parts = pair.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 2) continue;
             var lon = double.Parse(parts[0], CultureInfo.InvariantCulture);
             var lat = double.Parse(parts[1], CultureInfo.InvariantCulture);
-            points.Add(transform.ToUtm32(new GeoPoint(lat, lon)));
+            points.Add(transform.ToUtm(new GeoPoint(lat, lon)));
         }
         return new Polygon2D(points);
     }
@@ -58,34 +58,34 @@ public sealed class Polygon2D
     /// </summary>
     public static Polygon2D FromKml(string kmlContent, ICoordinateTransform? transform = null)
     {
-        transform ??= Etrs89Utm32Transform.Instance;
+        transform ??= Etrs89UtmTransform.Zone32;
         var root = XDocument.Parse(kmlContent).Root
                    ?? throw new FormatException("Empty KML document.");
         var coords = root.Descendants()
             .FirstOrDefault(e => e.Name.LocalName == "coordinates")?.Value
             ?? throw new FormatException("No <coordinates> element found in KML.");
 
-        var points = new List<Utm32Point>();
+        var points = new List<UtmPoint>();
         foreach (var tuple in coords.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
         {
             var parts = tuple.Split(',');
             if (parts.Length < 2) continue;
             var lon = double.Parse(parts[0], CultureInfo.InvariantCulture);
             var lat = double.Parse(parts[1], CultureInfo.InvariantCulture);
-            points.Add(transform.ToUtm32(new GeoPoint(lat, lon)));
+            points.Add(transform.ToUtm(new GeoPoint(lat, lon)));
         }
         return new Polygon2D(points);
     }
 
     public static Polygon2D FromBoundingBox(BoundingBox box) => new(new[]
     {
-        new Utm32Point(box.MinEasting, box.MinNorthing),
-        new Utm32Point(box.MaxEasting, box.MinNorthing),
-        new Utm32Point(box.MaxEasting, box.MaxNorthing),
-        new Utm32Point(box.MinEasting, box.MaxNorthing),
+        new UtmPoint(box.MinEasting, box.MinNorthing),
+        new UtmPoint(box.MaxEasting, box.MinNorthing),
+        new UtmPoint(box.MaxEasting, box.MaxNorthing),
+        new UtmPoint(box.MinEasting, box.MaxNorthing),
     });
 
-    public bool Contains(Utm32Point p)
+    public bool Contains(UtmPoint p)
     {
         // Ray casting; boundary points may land on either side, which is fine
         // for tile selection.
@@ -108,7 +108,7 @@ public sealed class Polygon2D
         foreach (var p in _points)
             if (box.Contains(p)) return true;
 
-        Span<Utm32Point> corners = stackalloc Utm32Point[]
+        Span<UtmPoint> corners = stackalloc UtmPoint[]
         {
             new(box.MinEasting, box.MinNorthing),
             new(box.MaxEasting, box.MinNorthing),
@@ -129,9 +129,9 @@ public sealed class Polygon2D
         return false;
     }
 
-    private static bool SegmentsIntersect(Utm32Point a, Utm32Point b, Utm32Point c, Utm32Point d)
+    private static bool SegmentsIntersect(UtmPoint a, UtmPoint b, UtmPoint c, UtmPoint d)
     {
-        static double Cross(Utm32Point o, Utm32Point p, Utm32Point q) =>
+        static double Cross(UtmPoint o, UtmPoint p, UtmPoint q) =>
             (p.Easting - o.Easting) * (q.Northing - o.Northing) -
             (p.Northing - o.Northing) * (q.Easting - o.Easting);
 

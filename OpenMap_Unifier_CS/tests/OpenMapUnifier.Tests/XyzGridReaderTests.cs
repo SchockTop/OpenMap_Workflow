@@ -30,7 +30,7 @@ public class XyzGridReaderTests
         // Row 0 is the northern row.
         Assert.Equal(100f, grid.ValueAt(0, 0));
         Assert.Equal(105f, grid.ValueAt(1, 2));
-        Assert.Equal(101.0, grid.Sample(new Utm32Point(729_007.5, 5_433_007.5)));
+        Assert.Equal(101.0, grid.Sample(new UtmPoint(729_007.5, 5_433_007.5)));
     }
 
     [Fact]

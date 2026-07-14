@@ -10,7 +10,7 @@ public class TileGridTests
     [Fact]
     public void TileFor_SnapsToKilometerGrid()
     {
-        var tile = TileGrid.TileFor(new Utm32Point(729_500.5, 5_433_999.9));
+        var tile = TileGrid.TileFor(new UtmPoint(729_500.5, 5_433_999.9));
         Assert.Equal(new TileId(729, 5433), tile);
     }
 
@@ -19,7 +19,7 @@ public class TileGridTests
     {
         // Marienplatz (~691.6 km E, 5334.8 km N) must land on LoD2 tile 690_5334,
         // the case documented in the Python catalog.
-        var tile = TileGrid.TileFor(new Utm32Point(691_607.86, 5_334_760.39), gridKm: 2);
+        var tile = TileGrid.TileFor(new UtmPoint(691_607.86, 5_334_760.39), gridKm: 2);
         Assert.Equal(new TileId(690, 5334, 2), tile);
     }
 
@@ -48,9 +48,9 @@ public class TileGridTests
         // upper-right tile must not be selected.
         var poly = new Polygon2D(new[]
         {
-            new Utm32Point(700_000, 5_400_000),
-            new Utm32Point(702_000, 5_400_000),
-            new Utm32Point(700_000, 5_402_000),
+            new UtmPoint(700_000, 5_400_000),
+            new UtmPoint(702_000, 5_400_000),
+            new UtmPoint(700_000, 5_402_000),
         });
         var tiles = TileGrid.TilesFor(poly).ToList();
         Assert.Equal(3, tiles.Count);

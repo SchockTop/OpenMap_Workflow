@@ -23,19 +23,22 @@ public sealed class TiledElevationProvider : IElevationProvider, IDisposable
     private readonly ConcurrentQueue<TileId> _lru = new();
 
     public string CacheDirectory { get; }
+    public ICoordinateTransform Transform { get; }
 
     public TiledElevationProvider(IHeightTileResolver resolver, string cacheDirectory,
-        IDownloader? downloader = null, int maxCachedGrids = 16)
+        IDownloader? downloader = null, int maxCachedGrids = 16,
+        ICoordinateTransform? transform = null)
     {
         _resolver = resolver;
         CacheDirectory = cacheDirectory;
         _ownsDownloader = downloader is null;
         _downloader = downloader ?? new HttpTileDownloader();
         _maxCachedGrids = Math.Max(1, maxCachedGrids);
+        Transform = transform ?? Etrs89UtmTransform.Zone32;
         Directory.CreateDirectory(cacheDirectory);
     }
 
-    public async Task<double?> GetElevationAsync(Utm32Point position, CancellationToken ct = default)
+    public async Task<double?> GetElevationAsync(UtmPoint position, CancellationToken ct = default)
     {
         var grid = await GetGridAsync(_resolver.TileFor(position), ct).ConfigureAwait(false);
         return grid?.Sample(position);

@@ -49,7 +49,7 @@ public static class NiedersachsenElevation
             _source = source ?? new NiedersachsenTileSource(new StacClient(proxy: proxy));
         }
 
-        public TileId TileFor(Utm32Point position) => TileGrid.TileFor(position, GridKm);
+        public TileId TileFor(UtmPoint position) => TileGrid.TileFor(position, GridKm);
 
         public async Task<DownloadJob?> JobForAsync(TileId tile, CancellationToken ct = default)
         {

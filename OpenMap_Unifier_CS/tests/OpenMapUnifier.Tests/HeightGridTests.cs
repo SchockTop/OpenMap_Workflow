@@ -16,8 +16,8 @@ public class HeightGridTests
     public void Sample_AtPixelCenter_ReturnsExactValue()
     {
         var grid = MakeGrid();
-        Assert.Equal(10, grid.Sample(new Utm32Point(100.5, 199.5)));
-        Assert.Equal(40, grid.Sample(new Utm32Point(101.5, 198.5)));
+        Assert.Equal(10, grid.Sample(new UtmPoint(100.5, 199.5)));
+        Assert.Equal(40, grid.Sample(new UtmPoint(101.5, 198.5)));
     }
 
     [Fact]
@@ -25,17 +25,17 @@ public class HeightGridTests
     {
         var grid = MakeGrid();
         // Exact middle of all four pixel centers -> mean.
-        Assert.Equal(25.0, grid.Sample(new Utm32Point(101.0, 199.0))!.Value, 6);
+        Assert.Equal(25.0, grid.Sample(new UtmPoint(101.0, 199.0))!.Value, 6);
         // Halfway between 10 and 20 along the top row.
-        Assert.Equal(15.0, grid.Sample(new Utm32Point(101.0, 199.5))!.Value, 6);
+        Assert.Equal(15.0, grid.Sample(new UtmPoint(101.0, 199.5))!.Value, 6);
     }
 
     [Fact]
     public void Sample_OutsideGrid_ReturnsNull()
     {
         var grid = MakeGrid();
-        Assert.Null(grid.Sample(new Utm32Point(99.9, 199.5)));
-        Assert.Null(grid.Sample(new Utm32Point(101.0, 202.0)));
+        Assert.Null(grid.Sample(new UtmPoint(99.9, 199.5)));
+        Assert.Null(grid.Sample(new UtmPoint(101.0, 202.0)));
     }
 
     [Fact]
@@ -43,16 +43,16 @@ public class HeightGridTests
     {
         var grid = new HeightGrid(new float[] { 10, -9999, 30, 40 }, 2, 2, 100, 200, 1.0);
         // Interpolation window touches the NoData pixel -> nearest pixel wins.
-        Assert.Equal(10, grid.Sample(new Utm32Point(100.6, 199.4)));
+        Assert.Equal(10, grid.Sample(new UtmPoint(100.6, 199.4)));
         // Nearest pixel itself is NoData -> null.
-        Assert.Null(grid.Sample(new Utm32Point(101.5, 199.5)));
+        Assert.Null(grid.Sample(new UtmPoint(101.5, 199.5)));
     }
 
     [Fact]
     public void SampleNearest_PicksContainingPixel()
     {
         var grid = MakeGrid();
-        Assert.Equal(30, grid.SampleNearest(new Utm32Point(100.1, 198.1)));
+        Assert.Equal(30, grid.SampleNearest(new UtmPoint(100.1, 198.1)));
     }
 
     [Fact]

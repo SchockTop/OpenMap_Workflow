@@ -9,10 +9,17 @@ namespace OpenMapUnifier.Core.Elevation;
 public interface IElevationProvider
 {
     /// <summary>
-    /// Elevation in meters above sea level, or null where no data exists
-    /// (outside coverage or NoData cells).
+    /// Transform between geographic coordinates and this provider's working
+    /// CRS. Zone 32 (EPSG:25832) for most states, zone 33 (EPSG:25833) for
+    /// Berlin/Brandenburg/Sachsen/MV — lat/lon queries route through this.
     /// </summary>
-    Task<double?> GetElevationAsync(Utm32Point position, CancellationToken ct = default);
+    ICoordinateTransform Transform { get; }
+
+    /// <summary>
+    /// Elevation in meters above sea level at a position in this provider's
+    /// working CRS, or null where no data exists (outside coverage or NoData).
+    /// </summary>
+    Task<double?> GetElevationAsync(UtmPoint position, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -27,7 +34,7 @@ public interface IElevationProvider
 public interface IHeightTileResolver
 {
     int GridKm { get; }
-    TileId TileFor(Utm32Point position);
+    TileId TileFor(UtmPoint position);
     Task<DownloadJob?> JobForAsync(TileId tile, CancellationToken ct = default);
     HeightGrid Parse(string localPath, TileId tile);
 }

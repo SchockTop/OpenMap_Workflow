@@ -40,7 +40,7 @@ public sealed class HeightGrid
 
     public float ValueAt(int row, int col) => Data[row * Width + col];
 
-    public bool Contains(Utm32Point p) =>
+    public bool Contains(UtmPoint p) =>
         p.Easting >= OriginEasting && p.Easting <= OriginEasting + Width * PixelSize &&
         p.Northing <= OriginNorthing && p.Northing >= OriginNorthing - Height * PixelSize;
 
@@ -49,7 +49,7 @@ public sealed class HeightGrid
     /// Pixel centers sit at corner + (i + 0.5) * pixel; sampling clamps to the
     /// outermost centers, so the outer half-pixel ring is nearest-neighbor.
     /// </summary>
-    public double? Sample(Utm32Point p)
+    public double? Sample(UtmPoint p)
     {
         if (!Contains(p)) return null;
 
@@ -80,7 +80,7 @@ public sealed class HeightGrid
     }
 
     /// <summary>Nearest-neighbor elevation, or null outside the grid / on NoData.</summary>
-    public double? SampleNearest(Utm32Point p)
+    public double? SampleNearest(UtmPoint p)
     {
         if (!Contains(p)) return null;
         var col = Math.Clamp((int)((p.Easting - OriginEasting) / PixelSize), 0, Width - 1);

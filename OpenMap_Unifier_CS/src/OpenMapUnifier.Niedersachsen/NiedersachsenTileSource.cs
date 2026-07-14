@@ -20,7 +20,7 @@ public sealed class NiedersachsenTileSource : IDisposable
     {
         _ownsClient = stacClient is null;
         _stac = stacClient ?? new StacClient();
-        _transform = transform ?? Etrs89Utm32Transform.Instance;
+        _transform = transform ?? Etrs89UtmTransform.Zone32;
     }
 
     public async Task<IReadOnlyList<DownloadJob>> JobsForAsync(string datasetId, BoundingBox area,
@@ -71,10 +71,10 @@ public sealed class NiedersachsenTileSource : IDisposable
         // border tiles aren't lost to rounding).
         var corners = new[]
         {
-            _transform.ToGeo(new Utm32Point(area.MinEasting, area.MinNorthing)),
-            _transform.ToGeo(new Utm32Point(area.MaxEasting, area.MinNorthing)),
-            _transform.ToGeo(new Utm32Point(area.MinEasting, area.MaxNorthing)),
-            _transform.ToGeo(new Utm32Point(area.MaxEasting, area.MaxNorthing)),
+            _transform.ToGeo(new UtmPoint(area.MinEasting, area.MinNorthing)),
+            _transform.ToGeo(new UtmPoint(area.MaxEasting, area.MinNorthing)),
+            _transform.ToGeo(new UtmPoint(area.MinEasting, area.MaxNorthing)),
+            _transform.ToGeo(new UtmPoint(area.MaxEasting, area.MaxNorthing)),
         };
         const double margin = 1e-5;
         var minLon = corners.Min(c => c.Longitude) - margin;

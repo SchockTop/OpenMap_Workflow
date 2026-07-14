@@ -1,20 +1,34 @@
 namespace OpenMapUnifier.Core.Geodesy;
 
 /// <summary>
-/// Default ETRS89 (GRS80) &lt;-&gt; EPSG:25832 transform using the Karney/Krüger
-/// 6th-order series (same method proj uses; accuracy is sub-millimeter inside
-/// the zone). WGS84 and ETRS89 differ by well under a meter in Bavaria, so
-/// WGS84 lat/lon (GPS, Google Earth, KML) can be fed in directly.
+/// ETRS89 (GRS80) &lt;-&gt; UTM transform using the Karney/Krüger 6th-order
+/// series (same method proj uses; accuracy is sub-millimeter inside a zone).
+/// German states publish in EPSG:25832 (<see cref="Zone32"/>, central meridian
+/// 9°E — the west/center/south) or EPSG:25833 (<see cref="Zone33"/>, 15°E —
+/// Berlin, Brandenburg, Sachsen, Mecklenburg-Vorpommern). WGS84 and ETRS89
+/// differ by well under a meter in Germany, so GPS/Google-Earth lat/lon can be
+/// fed in directly.
 /// </summary>
-public sealed class Etrs89Utm32Transform : ICoordinateTransform
+public sealed class Etrs89UtmTransform : ICoordinateTransform
 {
-    public static readonly Etrs89Utm32Transform Instance = new();
+    /// <summary>EPSG:25832 — ETRS89 / UTM zone 32N (central meridian 9°E).</summary>
+    public static readonly Etrs89UtmTransform Zone32 = new(32);
+
+    /// <summary>EPSG:25833 — ETRS89 / UTM zone 33N (central meridian 15°E).</summary>
+    public static readonly Etrs89UtmTransform Zone33 = new(33);
+
+    public static Etrs89UtmTransform ForZone(int zone) => zone switch
+    {
+        32 => Zone32,
+        33 => Zone33,
+        >= 1 and <= 60 => new Etrs89UtmTransform(zone),
+        _ => throw new ArgumentOutOfRangeException(nameof(zone), zone, "UTM zone must be 1-60."),
+    };
 
     private const double A = 6378137.0;                 // GRS80 semi-major axis
     private const double F = 1.0 / 298.257222101;       // GRS80 flattening
     private const double K0 = 0.9996;
     private const double FalseEasting = 500_000.0;
-    private const double Lon0Deg = 9.0;                 // zone 32 central meridian
 
     private static readonly double N1 = F / (2 - F);    // third flattening
     private static readonly double AA = ComputeAA();
@@ -22,10 +36,19 @@ public sealed class Etrs89Utm32Transform : ICoordinateTransform
     private static readonly double[] Beta = ComputeBeta();
     private static readonly double[] Delta = ComputeDelta();
 
-    public Utm32Point ToUtm32(GeoPoint geo)
+    public int Zone { get; }
+    private readonly double _lon0Deg;
+
+    private Etrs89UtmTransform(int zone)
+    {
+        Zone = zone;
+        _lon0Deg = zone * 6.0 - 183.0;
+    }
+
+    public UtmPoint ToUtm(GeoPoint geo)
     {
         var phi = geo.Latitude * Math.PI / 180.0;
-        var lam = (geo.Longitude - Lon0Deg) * Math.PI / 180.0;
+        var lam = (geo.Longitude - _lon0Deg) * Math.PI / 180.0;
 
         var e2n = 2 * Math.Sqrt(N1) / (1 + N1);
         var sinPhi = Math.Sin(phi);
@@ -40,10 +63,10 @@ public sealed class Etrs89Utm32Transform : ICoordinateTransform
             eta += Alpha[j] * Math.Cos(2 * j * xiP) * Math.Sinh(2 * j * etaP);
         }
 
-        return new Utm32Point(FalseEasting + K0 * AA * eta, K0 * AA * xi);
+        return new UtmPoint(FalseEasting + K0 * AA * eta, K0 * AA * xi);
     }
 
-    public GeoPoint ToGeo(Utm32Point utm)
+    public GeoPoint ToGeo(UtmPoint utm)
     {
         var xi = utm.Northing / (K0 * AA);
         var eta = (utm.Easting - FalseEasting) / (K0 * AA);
@@ -61,7 +84,7 @@ public sealed class Etrs89Utm32Transform : ICoordinateTransform
             phi += Delta[j] * Math.Sin(2 * j * chi);
 
         var lam = Math.Atan2(Math.Sinh(etaP), Math.Cos(xiP));
-        return new GeoPoint(phi * 180.0 / Math.PI, Lon0Deg + lam * 180.0 / Math.PI);
+        return new GeoPoint(phi * 180.0 / Math.PI, _lon0Deg + lam * 180.0 / Math.PI);
     }
 
     private static double Atanh(double x) => 0.5 * Math.Log((1 + x) / (1 - x));

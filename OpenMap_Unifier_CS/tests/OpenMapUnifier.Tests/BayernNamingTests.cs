@@ -55,7 +55,7 @@ public class BayernNamingTests
     {
         // The exact case documented in the Python catalog: Marienplatz
         // (UTM ~691, 5334) -> 690_5334.gml under /a/lod2/citygml/.
-        var tile = TileGrid.TileFor(new Utm32Point(691_607.86, 5_334_760.39),
+        var tile = TileGrid.TileFor(new UtmPoint(691_607.86, 5_334_760.39),
             BayernCatalog.Instance["lod2"].GridKm);
         var job = _source.JobFor("lod2", tile);
         Assert.Equal("690_5334.gml", job.FileName);

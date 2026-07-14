@@ -36,10 +36,10 @@ public class PolygonTests
     {
         var poly = new Polygon2D(new[]
         {
-            new Utm32Point(0, 0), new Utm32Point(10, 0), new Utm32Point(10, 10), new Utm32Point(0, 10),
+            new UtmPoint(0, 0), new UtmPoint(10, 0), new UtmPoint(10, 10), new UtmPoint(0, 10),
         });
-        Assert.True(poly.Contains(new Utm32Point(5, 5)));
-        Assert.False(poly.Contains(new Utm32Point(15, 5)));
+        Assert.True(poly.Contains(new UtmPoint(5, 5)));
+        Assert.False(poly.Contains(new UtmPoint(15, 5)));
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public class PolygonTests
         // and no box corner inside the triangle.
         var poly = new Polygon2D(new[]
         {
-            new Utm32Point(-10, 4), new Utm32Point(20, 4.6), new Utm32Point(-10, 5.2),
+            new UtmPoint(-10, 4), new UtmPoint(20, 4.6), new UtmPoint(-10, 5.2),
         });
         Assert.True(poly.Intersects(new BoundingBox(0, 0, 10, 10)));
     }
@@ -59,7 +59,7 @@ public class PolygonTests
     {
         var poly = new Polygon2D(new[]
         {
-            new Utm32Point(0, 0), new Utm32Point(10, 0), new Utm32Point(5, 10),
+            new UtmPoint(0, 0), new UtmPoint(10, 0), new UtmPoint(5, 10),
         });
         Assert.False(poly.Intersects(new BoundingBox(20, 20, 30, 30)));
     }
@@ -69,7 +69,7 @@ public class PolygonTests
     {
         var poly = new Polygon2D(new[]
         {
-            new Utm32Point(0, 0), new Utm32Point(100, 0), new Utm32Point(100, 100), new Utm32Point(0, 100),
+            new UtmPoint(0, 0), new UtmPoint(100, 0), new UtmPoint(100, 100), new UtmPoint(0, 100),
         });
         Assert.True(poly.Intersects(new BoundingBox(40, 40, 60, 60)));
     }
