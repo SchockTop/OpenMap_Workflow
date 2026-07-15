@@ -1,4 +1,4 @@
-using OpenMapUnifier.Core.Raster;
+using OpenMapUnifier.Raster;
 using Xunit;
 
 namespace OpenMapUnifier.Tests;

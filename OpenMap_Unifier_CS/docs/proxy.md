@@ -1,6 +1,6 @@
 # Corporate proxy & TLS
 
-`OpenMapUnifier.Core.Proxy.ProxyManager` is the C# port of the Python
+`OpenMapUnifier.Networking.Proxy.ProxyManager` is the C# port of the Python
 Unifier's proxy layer (`backend/proxy_manager.py`), keeping the behaviors that
 were hard-won there. Every HTTP client in the framework can be driven by it —
 pass a `ProxyManager` via `DownloaderOptions.Proxy` or the provider factories,
@@ -10,7 +10,7 @@ same proxy and TLS configuration.
 ## Quick start
 
 ```csharp
-using OpenMapUnifier.Core.Proxy;
+using OpenMapUnifier.Networking.Proxy;
 
 // Zero config: environment variables (HTTPS_PROXY/HTTP_PROXY) just work —
 // pass no ProxyManager at all, or use one for diagnostics:

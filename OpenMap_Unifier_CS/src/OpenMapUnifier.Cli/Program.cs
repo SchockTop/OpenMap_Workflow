@@ -1,11 +1,11 @@
 using System.Globalization;
 using OpenMapUnifier.Germany.Bayern;
-using OpenMapUnifier.Core.Downloading;
-using OpenMapUnifier.Core.Elevation;
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Grid;
-using OpenMapUnifier.Core.Proxy;
-using OpenMapUnifier.Core.Raster;
+using OpenMapUnifier.Networking;
+using OpenMapUnifier.Elevation;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Grid;
+using OpenMapUnifier.Networking.Proxy;
+using OpenMapUnifier.Raster;
 using OpenMapUnifier.Germany;
 
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "help";
@@ -270,7 +270,7 @@ static int ImportJson(string[] args)
     var file = Require(args, 1, "JSON file path");
     var targetEpsg = int.Parse(GetOption(args, "--to") ?? "25832", CultureInfo.InvariantCulture);
 
-    var options = new OpenMapUnifier.Core.Import.ImportOptions();
+    var options = new OpenMapUnifier.Import.ImportOptions();
     if (GetOption(args, "--assume-epsg") is { } assume)
         options.AssumeEpsg = int.Parse(assume, CultureInfo.InvariantCulture);
     if (GetOption(args, "--min-confidence") is { } minConf)
@@ -283,7 +283,7 @@ static int ImportJson(string[] args)
             _ => throw new ArgumentException("--region must be germany or central-europe."),
         };
 
-    var found = OpenMapUnifier.Core.Import.ChaoticJsonImporter.ScanFile(file, options);
+    var found = OpenMapUnifier.Import.ChaoticJsonImporter.ScanFile(file, options);
     if (found.Count == 0)
     {
         Console.WriteLine("No coordinates recognized in this JSON.");
@@ -303,7 +303,7 @@ static int ImportJson(string[] args)
 
     if (GetOption(args, "--out") is { } outPath)
     {
-        OpenMapUnifier.Core.Import.NormalizedGeoJson.WriteFile(outPath, found, targetEpsg);
+        OpenMapUnifier.Import.NormalizedGeoJson.WriteFile(outPath, found, targetEpsg);
         Console.WriteLine($"Normalized GeoJSON written to {outPath}");
     }
     return 0;

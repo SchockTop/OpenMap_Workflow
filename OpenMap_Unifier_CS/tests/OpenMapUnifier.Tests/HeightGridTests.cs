@@ -1,5 +1,5 @@
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Raster;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Raster;
 using Xunit;
 
 namespace OpenMapUnifier.Tests;

@@ -1,7 +1,7 @@
-using OpenMapUnifier.Core.Downloading;
-using OpenMapUnifier.Core.Elevation;
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Proxy;
+using OpenMapUnifier.Networking;
+using OpenMapUnifier.Elevation;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Networking.Proxy;
 
 namespace OpenMapUnifier.Germany;
 

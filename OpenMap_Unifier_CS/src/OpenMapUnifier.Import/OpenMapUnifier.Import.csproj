@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>OpenMapUnifier.Import</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../OpenMapUnifier.Geodesy/OpenMapUnifier.Geodesy.csproj" />
+  </ItemGroup>
+</Project>

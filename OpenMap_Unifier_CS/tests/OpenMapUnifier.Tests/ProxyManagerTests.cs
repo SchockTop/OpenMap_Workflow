@@ -1,5 +1,5 @@
 using System.Net;
-using OpenMapUnifier.Core.Proxy;
+using OpenMapUnifier.Networking.Proxy;
 using Xunit;
 
 namespace OpenMapUnifier.Tests;

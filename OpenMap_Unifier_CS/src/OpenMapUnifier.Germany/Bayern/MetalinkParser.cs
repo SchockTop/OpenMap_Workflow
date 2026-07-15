@@ -1,5 +1,5 @@
 using System.Xml.Linq;
-using OpenMapUnifier.Core.Downloading;
+using OpenMapUnifier.Networking;
 
 namespace OpenMapUnifier.Germany.Bayern;
 

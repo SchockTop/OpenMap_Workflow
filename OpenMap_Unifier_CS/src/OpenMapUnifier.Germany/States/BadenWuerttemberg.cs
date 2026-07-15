@@ -1,9 +1,9 @@
-using OpenMapUnifier.Core.Downloading;
-using OpenMapUnifier.Core.Elevation;
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Grid;
-using OpenMapUnifier.Core.Proxy;
-using OpenMapUnifier.Core.Raster;
+using OpenMapUnifier.Networking;
+using OpenMapUnifier.Elevation;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Grid;
+using OpenMapUnifier.Networking.Proxy;
+using OpenMapUnifier.Raster;
 using OpenMapUnifier.Germany.Common;
 
 namespace OpenMapUnifier.Germany.States;

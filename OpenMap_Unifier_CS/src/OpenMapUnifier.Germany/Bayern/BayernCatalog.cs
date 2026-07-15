@@ -1,4 +1,4 @@
-using OpenMapUnifier.Core.Catalog;
+using OpenMapUnifier.Germany.Catalog;
 
 namespace OpenMapUnifier.Germany.Bayern;
 

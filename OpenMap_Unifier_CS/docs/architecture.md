@@ -2,20 +2,22 @@
 
 ## Projects
 
-```
-OpenMapUnifier.Core      zero-dependency framework: geodesy, grid math, geometry,
-                         downloading (incl. remote-zip), proxy, raster readers,
-                         elevation engine, chaotic-JSON import
-OpenMapUnifier.Germany   ALL 16 states behind IGermanState (registry: GermanStates).
-                         Subnamespaces Germany.Bayern / Germany.Niedersachsen hold
-                         those states' extra machinery (WMS renders, metalink
-                         parsing, the STAC client) — usable directly when you need
-                         more than the uniform interface.
-OpenMapUnifier.Cli       `openmap` command-line front end
-OpenMapUnifier.Tests     offline xUnit suite (no network)
-```
+Layered assemblies; dependencies point strictly downward (enforced at compile
+time — an upward reference simply won't build):
 
-Dependency rule: Germany depends on Core only; Core knows no agency.
+| Module | Depends on | Contents |
+|---|---|---|
+| `OpenMapUnifier.Geodesy` | — (pure math) | coordinate types, all `ICoordinateTransform`s (UTM 32/33, WGS84-UTM, zE-N, Gauß-Krüger, Web Mercator), `TransverseMercator`, `HelmertTransform`/ECEF, `Ellipsoid`, `Dms`, `CrsRegistry`, `CoordinateDetector`, km-grid math (`TileGrid`), `Polygon2D` |
+| `OpenMapUnifier.Networking` | — (pure I/O) | `HttpTileDownloader` (mirrors, retries, atomic writes), `RemoteZipReader` (HTTP-range zip extraction), `ProxyManager` |
+| `OpenMapUnifier.Raster` | Geodesy | `HeightGrid` (bilinear sampling), `GeoTiffReader`, `XyzGridReader`, `WorldFile` |
+| `OpenMapUnifier.Import` | Geodesy | `ChaoticJsonImporter`, `ImportOptions`, `NormalizedGeoJson` |
+| `OpenMapUnifier.Elevation` | Geodesy, Raster, Networking | `IElevationProvider`, `TiledElevationProvider`, resolver interfaces |
+| `OpenMapUnifier.Germany` | Elevation (transitively all) | all 16 `IGermanState`s + registry; subnamespaces `.Bayern`/`.Niedersachsen` hold extra machinery (WMS renders, metalink, STAC client) |
+| `OpenMapUnifier.Cli` | Germany, Import | `openmap` front end |
+
+Pick your entry point by role: **flight/physics** → Geodesy alone (coordinate
+conversions, zero I/O); **computer graphics / pipeline** → Germany (terrain +
+imagery, everything transitively); **data wrangling** → Import.
 (History note: Bayern and Niedersachsen started as separate packages before
 the IGermanState registry existed; they were folded in once all 16 states
 were implemented, so there is exactly ONE way to reach any state.)
@@ -85,7 +87,7 @@ and/or `HelmertTransform` if it's a projected CRS on a shifted datum), add it
 to `CrsRegistry.Known`, and — if raw numbers should be auto-recognized — a
 range heuristic in `CoordinateDetector`.
 
-**Consume from your own code**: reference `OpenMapUnifier.Core` plus the state
+**Consume from your own code**: reference the modules you need plus the state
 package(s) you need. Everything the CLI does is a thin wrapper over public
 library APIs.
 

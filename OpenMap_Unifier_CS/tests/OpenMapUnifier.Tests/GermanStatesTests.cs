@@ -1,5 +1,5 @@
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Grid;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Grid;
 using OpenMapUnifier.Germany;
 using OpenMapUnifier.Germany.States;
 using Xunit;

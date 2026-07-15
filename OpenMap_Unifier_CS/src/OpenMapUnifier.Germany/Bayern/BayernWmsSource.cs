@@ -1,9 +1,9 @@
 using System.Globalization;
-using OpenMapUnifier.Core.Catalog;
-using OpenMapUnifier.Core.Downloading;
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Geometry;
-using OpenMapUnifier.Core.Grid;
+using OpenMapUnifier.Germany.Catalog;
+using OpenMapUnifier.Networking;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Geometry;
+using OpenMapUnifier.Grid;
 
 namespace OpenMapUnifier.Germany.Bayern;
 

@@ -1,6 +1,6 @@
 # Coordinate conversions
 
-Everything lives in `OpenMapUnifier.Core.Geodesy`, has zero dependencies, and
+Everything lives in `OpenMapUnifier.Geodesy`, has zero dependencies, and
 is verified against pyproj. This document explains what each CRS is, when you
 meet it in German geodata, the conventions that cause 90 % of conversion bugs,
 and the math underneath.
@@ -59,7 +59,7 @@ which state the data comes from (east: BE/BB/SN/MV → 25833).
 ## Usage
 
 ```csharp
-using OpenMapUnifier.Core.Geodesy;
+using OpenMapUnifier.Geodesy;
 
 // Simple: lat/lon <-> pipeline CRS
 var utm = Etrs89UtmTransform.Zone32.ToUtm(new GeoPoint(48.137222, 11.575556));

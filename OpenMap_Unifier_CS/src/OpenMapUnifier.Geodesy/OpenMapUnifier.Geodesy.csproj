@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>OpenMapUnifier.Geodesy</RootNamespace>
+  </PropertyGroup>
+</Project>

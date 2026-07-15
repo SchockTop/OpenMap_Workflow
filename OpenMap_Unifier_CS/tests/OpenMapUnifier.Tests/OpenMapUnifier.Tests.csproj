@@ -8,7 +8,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/OpenMapUnifier.Core/OpenMapUnifier.Core.csproj" />
+    <ProjectReference Include="../../src/OpenMapUnifier.Import/OpenMapUnifier.Import.csproj" />
     <ProjectReference Include="../../src/OpenMapUnifier.Germany/OpenMapUnifier.Germany.csproj" />
   </ItemGroup>
 </Project>

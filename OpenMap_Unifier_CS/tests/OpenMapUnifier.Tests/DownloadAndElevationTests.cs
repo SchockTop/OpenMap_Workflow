@@ -1,9 +1,9 @@
 using System.Net;
-using OpenMapUnifier.Core.Downloading;
-using OpenMapUnifier.Core.Elevation;
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Grid;
-using OpenMapUnifier.Core.Raster;
+using OpenMapUnifier.Networking;
+using OpenMapUnifier.Elevation;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Grid;
+using OpenMapUnifier.Raster;
 using Xunit;
 
 namespace OpenMapUnifier.Tests;

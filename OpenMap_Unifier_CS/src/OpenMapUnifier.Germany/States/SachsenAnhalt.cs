@@ -1,10 +1,10 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using OpenMapUnifier.Core.Downloading;
-using OpenMapUnifier.Core.Elevation;
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Grid;
-using OpenMapUnifier.Core.Proxy;
+using OpenMapUnifier.Networking;
+using OpenMapUnifier.Elevation;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Grid;
+using OpenMapUnifier.Networking.Proxy;
 using OpenMapUnifier.Germany.Common;
 
 namespace OpenMapUnifier.Germany.States;

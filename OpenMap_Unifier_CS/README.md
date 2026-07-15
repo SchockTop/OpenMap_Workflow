@@ -38,25 +38,41 @@ range-extracted remotely — no full downloads.
 and [architecture](docs/architecture.md) (interfaces, per-state mechanisms,
 extension recipes).
 
-## Layout
+## Modules
+
+Layered assemblies — reference only what you need; dependencies point strictly
+downward and are enforced at compile time:
 
 ```
-src/OpenMapUnifier.Core      Generic framework: geodesy (zones 32/33, GK, Web Mercator...),
-                             km-grid math, polygon selection, downloader, remote-zip
-                             reader, proxy manager, GeoTIFF/XYZ readers, elevation,
-                             chaotic-JSON import
-src/OpenMapUnifier.Germany   ALL 16 states behind one IGermanState interface
-                             (GermanStates.Get("by"), .Get("ni"), ... — Bayern/
-                             Niedersachsen extras live in the Bayern/ and
-                             Niedersachsen/ subnamespaces: WMS renders, metalink,
-                             STAC client)
-src/OpenMapUnifier.Cli       `openmap` command-line demo
-tests/OpenMapUnifier.Tests   xUnit suite (offline; no network needed)
+                 ┌───────────────────┐
+                 │      Geodesy      │  pure math, zero deps: coordinates,
+                 │                   │  transforms, grid, polygons, DMS,
+                 └─────▲───────▲─────┘  CRS registry, detection
+                       │       │
+     ┌─────────────────┤       └───────────────┐
+┌────┴─────┐    ┌──────┴─────┐    ┌────────────┴┐
+│  Raster  │    │   Import   │    │  Networking │  no geo deps: downloader,
+│          │    │ (chaotic   │    │             │  remote-zip reader, proxy
+└────▲─────┘    │   JSON)    │    └──────▲──────┘
+     │          └────────────┘           │
+     └───────────────┬───────────────────┘
+              ┌──────┴──────┐
+              │  Elevation  │  height-query engine (provider + resolvers)
+              └──────▲──────┘
+                     │
+              ┌──────┴──────┐
+              │   Germany   │  all 16 states behind IGermanState
+              └──────▲──────┘  (subnamespaces .Bayern/.Niedersachsen: WMS,
+                     │          metalink, STAC extras)
+              ┌──────┴──────┐
+              │     Cli     │  `openmap` front end
+              └─────────────┘
 ```
 
-`Core` knows nothing about any agency; everything state-specific sits behind
-`IGermanState` in one package. Each seam is an interface, so pieces can be
-swapped independently:
+Typical imports: a flight/physics tool takes **Geodesy** alone (coordinate
+conversions, no I/O); a graphics tool takes **Germany** (terrain + imagery,
+everything transitively); a data-cleaning script takes **Import**. Each seam
+is an interface, so pieces can be swapped independently:
 
 | Interface | Role | Default |
 |---|---|---|
@@ -68,7 +84,7 @@ swapped independently:
 
 ## Coordinate conversions — every CRS German geodata comes in
 
-`OpenMapUnifier.Core.Geodesy` covers the full zoo (all verified against
+`OpenMapUnifier.Geodesy` covers the full zoo (all verified against
 pyproj; the projection engine is the ellipsoid-generic Karney/Krüger series):
 
 | EPSG | CRS | Class |
@@ -116,7 +132,7 @@ normalized GeoJSON with full provenance per point.
 
 ## Corporate proxy support
 
-`OpenMapUnifier.Core.Proxy.ProxyManager` ports the Python Unifier's proxy
+`OpenMapUnifier.Networking.Proxy.ProxyManager` ports the Python Unifier's proxy
 manager with the same hard-won specifics:
 
 - Auto-detect from `HTTPS_PROXY`/`HTTP_PROXY` (upper- and lowercase); manual
@@ -197,10 +213,10 @@ dotnet run -- download dgm1 --bbox 691000,5334000,693000,5335000 --out downloads
 ## Library usage
 
 ```csharp
-using OpenMapUnifier.Core.Downloading;
-using OpenMapUnifier.Core.Elevation;
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Geometry;
+using OpenMapUnifier.Networking;
+using OpenMapUnifier.Elevation;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Geometry;
 using OpenMapUnifier.Germany;
 
 // --- One registry for all 16 states -----------------------------------------

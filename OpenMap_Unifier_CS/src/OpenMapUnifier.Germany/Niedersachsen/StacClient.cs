@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
-using OpenMapUnifier.Core.Proxy;
+using OpenMapUnifier.Networking.Proxy;
 
 namespace OpenMapUnifier.Germany.Niedersachsen;
 

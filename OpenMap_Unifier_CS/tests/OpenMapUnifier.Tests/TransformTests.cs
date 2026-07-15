@@ -1,4 +1,4 @@
-using OpenMapUnifier.Core.Geodesy;
+using OpenMapUnifier.Geodesy;
 using Xunit;
 
 namespace OpenMapUnifier.Tests;
