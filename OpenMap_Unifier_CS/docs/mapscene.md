@@ -49,6 +49,7 @@ everything an interface-sized building block.
 | `GroundMask` | areas on the ground: by polygon, by condition, by class, by object height (nDSM); set algebra + `Dilate` |
 | `CoverageAnalyzer` | ground actually seen by a sensor along the whole flight (occlusion-aware) |
 | `PointSet` + `UnityPointsExport` | points you set (markers, trajectory, boresight track) → JSON render targets for Unity |
+| `UnitySceneExport` | whole scene as a bundle folder for the interactive Unity viewer (unity/OpenMapViewer) |
 | `SceneDocument` + `SceneRunner` | the whole session as one JSON file, executed by `openmap scene` |
 | `GeoTiffWriter` (in Raster) | write masks/terrain as georeferenced GeoTIFF for QGIS/Blender |
 
@@ -207,16 +208,30 @@ is the library entry if you want it inside your own tool.
   "outputs": {
     "coverageGeoTiff": "coverage.tif", "frameStepSeconds": 1, "quality": 32,
     "unityPoints": "points.json", "pointStepSeconds": 1,
-    "includeTrajectory": true, "includeBoresight": true
+    "includeTrajectory": true, "includeBoresight": true,
+    "unityScene": "unity_bundle"
   }
 }
 ```
 
+## The Unity viewer (`unity/OpenMapViewer`)
+
+`"unityScene"` writes a complete viewer bundle: manifest + raw heightmap +
+overlay PNGs (coverage is added automatically when trajectory + sensor are
+present) + trajectory + points. Copy the `Assets/OpenMap` folder from
+[unity/OpenMapViewer](../unity/OpenMapViewer/README.md) into any Unity
+project (no packages needed), point the `OpenMapSceneLoader` component at
+the bundle, press Play — terrain, flight playback with timeline, live sensor
+frustum + boresight ground point, overlay toggles and point markers, all
+interactive. `UnitySceneExport.Write(...)` is the same thing as a library
+call.
+
 ## Decisions log (was: open questions)
 
-1. **Rendering target** — no Blender/glTF integration for now; the one
-   export is Unity render-target points (`UnityPointsExport`). Masks/terrain
-   still go out as GeoTIFF for GIS tools.
+1. **Rendering target** — Unity. Render-target points export via
+   `UnityPointsExport`, and the full interactive visualization ships as a
+   drop-in Unity script folder (see the Unity viewer section above).
+   Masks/terrain still go out as GeoTIFF for GIS tools.
 2. **Rotation source** — both Euler and quaternions, quaternions win when
    present (see above).
 3. **Sensor models** — the typical three: pyramid / cone (level) / cylinder.

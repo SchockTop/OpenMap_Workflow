@@ -114,4 +114,8 @@ public sealed class OutputSpec
     public double PointStepSeconds { get; set; } = 1.0;
     public bool IncludeTrajectory { get; set; } = true;
     public bool IncludeBoresight { get; set; } = true;
+
+    /// <summary>Folder for a complete Unity viewer bundle (terrain, overlays,
+    /// trajectory, points, sensor) — loaded by unity/OpenMapViewer.</summary>
+    public string? UnityScene { get; set; }
 }

@@ -35,7 +35,9 @@ range-extracted remotely — no full downloads.
 **Detailed guides** live in [`docs/`](docs/): [conversions](docs/conversions.md)
 (every CRS, axis-order conventions, the math, accuracy),
 [chaotic-JSON import](docs/json-import.md), [MapScene](docs/mapscene.md)
-(trajectories, line-of-sight, ground areas, coverage), [proxy/TLS setup](docs/proxy.md),
+(trajectories, line-of-sight, ground areas, coverage),
+[Unity viewer](unity/OpenMapViewer/README.md) (drop-in interactive 3D
+visualization of exported scenes), [proxy/TLS setup](docs/proxy.md),
 and [architecture](docs/architecture.md) (interfaces, per-state mechanisms,
 extension recipes).
 

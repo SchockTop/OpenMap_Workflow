@@ -33,6 +33,7 @@ public static class SceneRunner
         if (sensor is not null)
             log($"Sensor: {sensor.Name} ({doc.Sensor!.Type})");
 
+        var masks = new List<(string Name, GroundMask Mask)>();
         foreach (var area in doc.Areas)
         {
             var mask = area switch
@@ -44,6 +45,7 @@ public static class SceneRunner
             };
             if (area.DilateMeters > 0)
                 mask = mask.Dilate(area.DilateMeters);
+            masks.Add((area.Name, mask));
             log(FormattableString.Invariant(
                 $"Area '{area.Name}': {mask.AreaSquareMeters():F0} m²"));
             if (area.GeoTiff is { } tiff)
@@ -54,29 +56,50 @@ public static class SceneRunner
         }
 
         var o = doc.Outputs;
-        if (o.CoverageGeoTiff is { } coveragePath)
+        if (o.CoverageGeoTiff is not null || o.UnityScene is not null)
         {
-            if (trajectory is null || sensor is null)
+            if (trajectory is not null && sensor is not null)
+            {
+                var seen = map.Coverage.SeenGround(trajectory, sensor, o.FrameStepSeconds, o.Quality);
+                masks.Insert(0, ("coverage", seen));
+                log(FormattableString.Invariant($"Coverage: {seen.AreaSquareMeters():F0} m² seen"));
+                if (o.CoverageGeoTiff is { } coveragePath)
+                {
+                    seen.SaveGeoTiff(Resolve(coveragePath));
+                    written.Add(Resolve(coveragePath));
+                }
+            }
+            else if (o.CoverageGeoTiff is not null)
+            {
                 throw new InvalidDataException("The coverage output needs both a trajectory and a sensor.");
-            var seen = map.Coverage.SeenGround(trajectory, sensor, o.FrameStepSeconds, o.Quality);
-            seen.SaveGeoTiff(Resolve(coveragePath));
-            written.Add(Resolve(coveragePath));
-            log(FormattableString.Invariant(
-                $"Coverage: {seen.AreaSquareMeters():F0} m² seen -> {coveragePath}"));
+            }
         }
 
-        if (o.UnityPoints is { } pointsPath)
+        PointSet? points = null;
+        if (trajectory is not null)
         {
-            if (trajectory is null)
-                throw new InvalidDataException("The Unity points output needs a trajectory.");
-            var points = new PointSet(map.Anchor);
+            points = new PointSet(map.Anchor);
             if (o.IncludeTrajectory)
                 points.AddTrajectory(trajectory, o.PointStepSeconds);
             if (o.IncludeBoresight && sensor is not null)
                 points.AddBoresightTrack(trajectory, sensor, map.LineOfSight, o.PointStepSeconds);
+        }
+
+        if (o.UnityPoints is { } pointsPath)
+        {
+            if (points is null)
+                throw new InvalidDataException("The Unity points output needs a trajectory.");
             UnityPointsExport.WriteFile(Resolve(pointsPath), points);
             written.Add(Resolve(pointsPath));
             log($"Points: {points.Points.Count} -> {pointsPath}");
+        }
+
+        if (o.UnityScene is { } bundleDir)
+        {
+            var files = UnitySceneExport.Write(Resolve(bundleDir), map,
+                trajectory, sensor, points, masks);
+            written.AddRange(files);
+            log($"Unity bundle: {files.Count} files -> {bundleDir}");
         }
 
         return written;

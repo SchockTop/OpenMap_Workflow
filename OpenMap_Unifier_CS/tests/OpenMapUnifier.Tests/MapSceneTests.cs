@@ -391,6 +391,96 @@ public class MapSceneTests
     }
 
     [Fact]
+    public void PngWriter_ProducesValidGrayscalePng()
+    {
+        var dir = Directory.CreateTempSubdirectory("mapscene-");
+        try
+        {
+            var pixels = new byte[] { 0, 64, 128, 255, 10, 20 };
+            var path = Path.Combine(dir.FullName, "mask.png");
+            PngWriter.WriteGrayscale(path, pixels, 3, 2);
+
+            var bytes = File.ReadAllBytes(path);
+            Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, bytes[..8]);
+
+            // IHDR: length 13 at offset 8, then type, then width/height big-endian.
+            Assert.Equal("IHDR", System.Text.Encoding.ASCII.GetString(bytes, 12, 4));
+            Assert.Equal(3, (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19]);
+            Assert.Equal(2, (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23]);
+            Assert.Equal(8, bytes[24]);  // bit depth
+            Assert.Equal(0, bytes[25]);  // grayscale
+
+            // Inflate the IDAT payload and check filter bytes + pixel rows.
+            // Signature(8) + IHDR chunk(25) -> IDAT length at 33, data at 41.
+            Assert.Equal("IDAT", System.Text.Encoding.ASCII.GetString(bytes, 37, 4));
+            var idatLength = (bytes[33] << 24) | (bytes[34] << 16) | (bytes[35] << 8) | bytes[36];
+            using var z = new System.IO.Compression.ZLibStream(
+                new MemoryStream(bytes, 41, idatLength),
+                System.IO.Compression.CompressionMode.Decompress);
+            using var raw = new MemoryStream();
+            z.CopyTo(raw);
+            Assert.Equal(new byte[] { 0, 0, 64, 128, 0, 255, 10, 20 }, raw.ToArray());
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void UnitySceneExport_WritesLoadableBundle()
+    {
+        var dir = Directory.CreateTempSubdirectory("mapscene-");
+        try
+        {
+            var terrainPath = Path.Combine(dir.FullName, "terrain.tif");
+            GeoTiffWriter.Write(terrainPath, MakeRidgeTerrain().Grid);
+            var map = Map.FromFiles(terrainPath);
+            var trajectory = new Trajectory(map.Anchor, new[]
+            {
+                new TrajectorySample(0, new Vector3(-80, 0, 160), 90, 0, 0),
+                new TrajectorySample(10, new Vector3(-40, 0, 160), 90, 0, 0),
+            });
+            var sensor = new ConeSensor("spot", HalfAngleDeg: 25);
+            var ridge = GroundMask.FromCondition(map.Terrain, p => map.Terrain.HeightAt(p) > 120);
+
+            var bundle = Path.Combine(dir.FullName, "bundle");
+            var files = UnitySceneExport.Write(bundle, map, trajectory, sensor,
+                new PointSet(map.Anchor).AddTrajectory(trajectory, 5),
+                new[] { ("ridge", ridge) });
+
+            Assert.Equal(5, files.Count);
+            Assert.Equal(200 * 200 * 4,
+                new FileInfo(Path.Combine(bundle, "terrain_heights.r32")).Length);
+
+            using var manifest = System.Text.Json.JsonDocument.Parse(
+                File.ReadAllText(Path.Combine(bundle, "manifest.json")));
+            var root = manifest.RootElement;
+            var terrain = root.GetProperty("terrain");
+            Assert.Equal(200, terrain.GetProperty("width").GetInt32());
+            Assert.Equal(100, terrain.GetProperty("minHeight").GetDouble(), 2);
+            Assert.Equal(140, terrain.GetProperty("maxHeight").GetDouble(), 2);
+            // Anchor at grid center: top-left cell center is 99.5 m west/north.
+            Assert.Equal(-99.5, terrain.GetProperty("originX").GetDouble(), 2);
+            Assert.Equal(99.5, terrain.GetProperty("originZTop").GetDouble(), 2);
+            Assert.Equal("cone", root.GetProperty("sensor").GetProperty("type").GetString());
+            Assert.Equal(25, root.GetProperty("sensor").GetProperty("halfAngleDeg").GetDouble(), 2);
+            Assert.Equal("overlay_ridge.png",
+                root.GetProperty("overlays")[0].GetProperty("file").GetString());
+
+            using var traj = System.Text.Json.JsonDocument.Parse(
+                File.ReadAllText(Path.Combine(bundle, "trajectory.json")));
+            var sample = traj.RootElement.GetProperty("samples")[0];
+            Assert.Equal(-80, sample.GetProperty("x").GetDouble(), 3);
+            Assert.False(sample.GetProperty("hasQuat").GetBoolean());
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task SceneDocument_RunsEndToEndFromFiles()
     {
         var dir = Directory.CreateTempSubdirectory("mapscene-");
@@ -411,7 +501,8 @@ public class MapSceneTests
                   "outputs": {
                     "coverageGeoTiff": "coverage.tif",
                     "unityPoints": "points.json",
-                    "pointStepSeconds": 5
+                    "pointStepSeconds": 5,
+                    "unityScene": "bundle"
                   }
                 }
                 """);
@@ -420,7 +511,15 @@ public class MapSceneTests
             var messages = new List<string>();
             var written = await SceneRunner.RunAsync(doc, dir.FullName, messages.Add);
 
-            Assert.Equal(2, written.Count);
+            // coverage.tif + points.json + 5 bundle files (heights, coverage
+            // overlay, trajectory, points, manifest).
+            Assert.Equal(7, written.Count);
+            using var bundleManifest = System.Text.Json.JsonDocument.Parse(
+                File.ReadAllText(Path.Combine(dir.FullName, "bundle", "manifest.json")));
+            Assert.Equal("coverage", bundleManifest.RootElement
+                .GetProperty("overlays")[0].GetProperty("name").GetString());
+            Assert.Equal("cone", bundleManifest.RootElement
+                .GetProperty("sensor").GetProperty("type").GetString());
             var coverage = GeoTiffReader.Read(Path.Combine(dir.FullName, "coverage.tif"));
             Assert.Contains(coverage.Data, v => v == 1f);
 
