@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Text.RegularExpressions;
-using OpenMapUnifier.Core.Downloading;
-using OpenMapUnifier.Core.Raster;
+using OpenMapUnifier.Networking;
+using OpenMapUnifier.Raster;
 
 namespace OpenMapUnifier.Germany.Common;
 

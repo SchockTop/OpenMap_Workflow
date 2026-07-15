@@ -38,34 +38,53 @@ range-extracted remotely — no full downloads.
 and [architecture](docs/architecture.md) (interfaces, per-state mechanisms,
 extension recipes).
 
-## Layout
+## Modules
+
+Layered assemblies — reference only what you need; dependencies point strictly
+downward and are enforced at compile time:
 
 ```
-src/OpenMapUnifier.Core           Generic framework: geodesy (zones 32/33), km-grid math,
-                                  polygon selection, downloader, remote-zip reader, proxy
-                                  manager, GeoTIFF/XYZ readers, elevation
-src/OpenMapUnifier.Bayern         Bayern LDBV: catalog, tile naming, WMS, metalink
-src/OpenMapUnifier.Niedersachsen  LGLN OpenGeoData: STAC client, catalog, resolvers
-src/OpenMapUnifier.Germany        The other 14 states behind one IGermanState interface
-src/OpenMapUnifier.Cli            `openmap` command-line demo
-tests/OpenMapUnifier.Tests        xUnit suite (offline; no network needed)
+                 ┌───────────────────┐
+                 │      Geodesy      │  pure math, zero deps: coordinates,
+                 │                   │  transforms, grid, polygons, DMS,
+                 └─────▲───────▲─────┘  CRS registry, detection
+                       │       │
+     ┌─────────────────┤       └───────────────┐
+┌────┴─────┐    ┌──────┴─────┐    ┌────────────┴┐
+│  Raster  │    │   Import   │    │  Networking │  no geo deps: downloader,
+│          │    │ (chaotic   │    │             │  remote-zip reader, proxy
+└────▲─────┘    │   JSON)    │    └──────▲──────┘
+     │          └────────────┘           │
+     └───────────────┬───────────────────┘
+              ┌──────┴──────┐
+              │  Elevation  │  height-query engine (provider + resolvers)
+              └──────▲──────┘
+                     │
+              ┌──────┴──────┐
+              │   Germany   │  all 16 states behind IGermanState
+              └──────▲──────┘  (subnamespaces .Bayern/.Niedersachsen: WMS,
+                     │          metalink, STAC extras)
+              ┌──────┴──────┐
+              │     Cli     │  `openmap` front end
+              └─────────────┘
 ```
 
-State-specific code lives in its own package; `Core` knows nothing about
-any agency. Each seam is an interface, so pieces can be swapped
-independently:
+Typical imports: a flight/physics tool takes **Geodesy** alone (coordinate
+conversions, no I/O); a graphics tool takes **Germany** (terrain + imagery,
+everything transitively); a data-cleaning script takes **Import**. Each seam
+is an interface, so pieces can be swapped independently:
 
 | Interface | Role | Default |
 |---|---|---|
-| `ICoordinateTransform` | lat/lon ↔ UTM32 | `Etrs89Utm32Transform` (Karney/Krüger series, sub-mm) |
+| `IGermanState` | one state: datasets, jobs-for-area, elevation factory | 16 classes, registry `GermanStates` |
+| `ICoordinateTransform` | lat/lon ↔ planar CRS | `Etrs89UtmTransform.Zone32/33` (Karney/Krüger, sub-mm) |
 | `IDownloader` | fetching files | `HttpTileDownloader` (mirrors, retries, atomic writes) |
-| `IHeightTileResolver` | position → tile → parsed grid | Bayern: grid math; Niedersachsen: STAC lookup |
+| `IHeightTileResolver` (+`ITileFetcher`) | position → tile → parsed grid | grid math / index / API / remote-zip per state |
 | `IElevationProvider` | height queries | `TiledElevationProvider` (on-demand download + LRU) |
-| `IDatasetCatalog` | dataset metadata | `BayernCatalog` / `NiedersachsenCatalog` |
 
 ## Coordinate conversions — every CRS German geodata comes in
 
-`OpenMapUnifier.Core.Geodesy` covers the full zoo (all verified against
+`OpenMapUnifier.Geodesy` covers the full zoo (all verified against
 pyproj; the projection engine is the ellipsoid-generic Karney/Krüger series):
 
 | EPSG | CRS | Class |
@@ -113,7 +132,7 @@ normalized GeoJSON with full provenance per point.
 
 ## Corporate proxy support
 
-`OpenMapUnifier.Core.Proxy.ProxyManager` ports the Python Unifier's proxy
+`OpenMapUnifier.Networking.Proxy.ProxyManager` ports the Python Unifier's proxy
 manager with the same hard-won specifics:
 
 - Auto-detect from `HTTPS_PROXY`/`HTTP_PROXY` (upper- and lowercase); manual
@@ -140,7 +159,7 @@ var proxy = new ProxyManager();
 proxy.SetManualProxy("proxy.company.com:8080", ProxyAuthType.Basic, "user", "p@ss!");
 proxy.SetSsl(sslVerify: true, caBundlePath: @"C:\corp\rootca.pem");
 using var downloader = new HttpTileDownloader(new DownloaderOptions { Proxy = proxy });
-using var terrain = NiedersachsenElevation.CreateDgm1Provider("tilecache", downloader, proxy);
+using var terrain = GermanStates.Get("ni").CreateElevationProvider("dgm1", "tilecache", downloader, proxy);
 ```
 
 **Bring your own coordinate algorithms:** implement `ICoordinateTransform`
@@ -194,38 +213,42 @@ dotnet run -- download dgm1 --bbox 691000,5334000,693000,5335000 --out downloads
 ## Library usage
 
 ```csharp
-using OpenMapUnifier.Bayern;
-using OpenMapUnifier.Core.Downloading;
-using OpenMapUnifier.Core.Elevation;
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Geometry;
+using OpenMapUnifier.Networking;
+using OpenMapUnifier.Elevation;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Geometry;
+using OpenMapUnifier.Germany;
+
+// --- One registry for all 16 states -----------------------------------------
+var bayern = GermanStates.Get("by");
+var berlin = GermanStates.Get("be");   // zone-33 state — Transform handles it
 
 // --- Height at a position (tiles fetched + cached on demand) ---------------
-using var terrain = BayernElevation.CreateDgm1Provider("tilecache");
-double? h = await terrain.GetElevationAsync(new Utm32Point(729500.5, 5433500.5));
+using var terrain = bayern.CreateElevationProvider("dgm1", "tilecache");
+double? h = await terrain.GetElevationAsync(new UtmPoint(729500.5, 5433500.5));
 double? h2 = await terrain.GetElevationAsync(new GeoPoint(48.137222, 11.575556));
 
-// Niedersachsen: identical API, tiles resolved via LGLN's STAC catalog
-using var niTerrain = NiedersachsenElevation.CreateDgm1Provider("tilecache");
-double? h3 = await niTerrain.GetElevationAsync(new GeoPoint(52.374, 9.738));
+using var beTerrain = berlin.CreateElevationProvider("dgm1", "tilecache");
+double? h3 = await beTerrain.GetElevationAsync(new GeoPoint(52.52, 13.405));
 
 // Handy derived queries
 var profile = await terrain.GetProfileAsync(a, b, samples: 200);
 var slopeAspect = await terrain.GetSlopeAspectAsync(p);
 
 // Object height above ground (nDSM) = surface minus terrain
-using var surface = BayernElevation.CreateDom20Provider("tilecache");
+using var surface = bayern.CreateElevationProvider("dom20", "tilecache");
 double? ndsm = await surface.GetElevationAsync(p) - await terrain.GetElevationAsync(p);
 
 // --- Bulk download ----------------------------------------------------------
-var source = new BayernTileSource();
-var area = BoundingBox.Around(new Utm32Point(691_607, 5_334_760), radiusMeters: 1500);
+var area = BoundingBox.Around(new UtmPoint(691_607, 5_334_760), radiusMeters: 1500);
+var jobs = await bayern.JobsForAsync("dop20", area);
 using var downloader = new HttpTileDownloader(new DownloaderOptions { MaxParallel = 6 });
-var results = await downloader.DownloadAllAsync(source.JobsFor("dop20", area), "downloads");
+var results = await downloader.DownloadAllAsync(jobs, "downloads");
 
-// Region from a Google Earth KML polygon instead of a box
+// Bayern extras (WMS renders, metalink, polygon selection) live on:
+using OpenMapUnifier.Germany.Bayern;   // BayernTileSource, BayernWmsSource, MetalinkParser
 var polygon = Polygon2D.FromKml(File.ReadAllText("region.kml"));
-var jobs = source.JobsFor("dgm1", polygon);
+var polyJobs = new BayernTileSource().JobsFor("dgm1", polygon);
 ```
 
 ## Verified against real data

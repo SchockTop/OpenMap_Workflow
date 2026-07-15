@@ -1,6 +1,6 @@
 # Chaotic JSON import
 
-`ChaoticJsonImporter` (namespace `OpenMapUnifier.Core.Import`) recovers
+`ChaoticJsonImporter` (namespace `OpenMapUnifier.Import`) recovers
 coordinates from JSON files whose structure and coordinate formats are
 inconsistent — mixed CRS, mixed spellings, numbers as strings, German decimal
 commas, coordinates buried in free text. You point it at the document; it
@@ -11,7 +11,7 @@ openmap import-json flight.json --to 25832 --out normalized.geojson
 ```
 
 ```csharp
-using OpenMapUnifier.Core.Import;
+using OpenMapUnifier.Import;
 
 var found = ChaoticJsonImporter.ScanFile("flight.json");
 foreach (var f in found)

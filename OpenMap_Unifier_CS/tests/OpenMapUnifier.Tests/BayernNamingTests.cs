@@ -1,6 +1,6 @@
-using OpenMapUnifier.Bayern;
-using OpenMapUnifier.Core.Geodesy;
-using OpenMapUnifier.Core.Grid;
+using OpenMapUnifier.Germany.Bayern;
+using OpenMapUnifier.Geodesy;
+using OpenMapUnifier.Grid;
 using Xunit;
 
 namespace OpenMapUnifier.Tests;

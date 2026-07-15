@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>OpenMapUnifier.Elevation</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../OpenMapUnifier.Geodesy/OpenMapUnifier.Geodesy.csproj" />
+    <ProjectReference Include="../OpenMapUnifier.Raster/OpenMapUnifier.Raster.csproj" />
+    <ProjectReference Include="../OpenMapUnifier.Networking/OpenMapUnifier.Networking.csproj" />
+  </ItemGroup>
+</Project>

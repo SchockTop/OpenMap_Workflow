@@ -6,9 +6,7 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../OpenMapUnifier.Core/OpenMapUnifier.Core.csproj" />
-    <ProjectReference Include="../OpenMapUnifier.Bayern/OpenMapUnifier.Bayern.csproj" />
-    <ProjectReference Include="../OpenMapUnifier.Niedersachsen/OpenMapUnifier.Niedersachsen.csproj" />
+    <ProjectReference Include="../OpenMapUnifier.Import/OpenMapUnifier.Import.csproj" />
     <ProjectReference Include="../OpenMapUnifier.Germany/OpenMapUnifier.Germany.csproj" />
   </ItemGroup>
 </Project>

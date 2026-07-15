@@ -1,4 +1,4 @@
-using OpenMapUnifier.Niedersachsen;
+using OpenMapUnifier.Germany.Niedersachsen;
 using Xunit;
 
 namespace OpenMapUnifier.Tests;
@@ -132,7 +132,7 @@ public class NiedersachsenTests
     {
         using var source = new NiedersachsenTileSource(
             new StacClient(new HttpClient(new StubStacHandler())));
-        var area = new Core.Geodesy.BoundingBox(550_000, 5_802_000, 551_000, 5_804_000);
+        var area = new OpenMapUnifier.Geodesy.BoundingBox(550_000, 5_802_000, 551_000, 5_804_000);
 
         var jobs = await source.JobsForAsync("dgm1", area);
 

@@ -3,7 +3,7 @@
     <RootNamespace>OpenMapUnifier.Germany</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../OpenMapUnifier.Core/OpenMapUnifier.Core.csproj" />
+    <ProjectReference Include="../OpenMapUnifier.Elevation/OpenMapUnifier.Elevation.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="OpenMapUnifier.Tests" />
