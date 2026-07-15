@@ -13,6 +13,7 @@ time — an upward reference simply won't build):
 | `OpenMapUnifier.Import` | Geodesy | `ChaoticJsonImporter`, `ImportOptions`, `NormalizedGeoJson` |
 | `OpenMapUnifier.Elevation` | Geodesy, Raster, Networking | `IElevationProvider`, `TiledElevationProvider`, resolver interfaces |
 | `OpenMapUnifier.Germany` | Elevation (transitively all) | all 16 `IGermanState`s + registry; subnamespaces `.Bayern`/`.Niedersachsen` hold extra machinery (WMS renders, metalink, STAC client) |
+| `OpenMapUnifier.MapScene` | Germany | the map as an object: scene anchor, terrain/classification layers, trajectories (CSV/JSON mapping), sensors, line-of-sight, ground masks, coverage — see [mapscene.md](mapscene.md) |
 | `OpenMapUnifier.Cli` | Germany, Import | `openmap` front end |
 
 Pick your entry point by role: **flight/physics** → Geodesy alone (coordinate
