@@ -5,7 +5,6 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{9600BD14-0E72-43E1-A7A8-E952084337A8}"
 EndProject
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenMapUnifier.Cli", "src\OpenMapUnifier.Cli\OpenMapUnifier.Cli.csproj", "{60AD178F-3609-4A8A-8C74-592FC112D0ED}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{E3FB99E9-47AE-48D3-A1D6-34DEAB381896}"
@@ -23,6 +22,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenMapUnifier.Elevation", "src\OpenMapUnifier.Elevation\OpenMapUnifier.Elevation.csproj", "{8CFDCF13-34C0-4D84-AE63-3D9372DE765B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenMapUnifier.Import", "src\OpenMapUnifier.Import\OpenMapUnifier.Import.csproj", "{6578A617-5A45-47AE-A023-315A5E0CB83F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenMapUnifier.MapScene", "src\OpenMapUnifier.MapScene\OpenMapUnifier.MapScene.csproj", "{6D8904F4-7955-468A-87BB-04EF71C737FF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -65,6 +66,10 @@ Global
 		{6578A617-5A45-47AE-A023-315A5E0CB83F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6578A617-5A45-47AE-A023-315A5E0CB83F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6578A617-5A45-47AE-A023-315A5E0CB83F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D8904F4-7955-468A-87BB-04EF71C737FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D8904F4-7955-468A-87BB-04EF71C737FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D8904F4-7955-468A-87BB-04EF71C737FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D8904F4-7955-468A-87BB-04EF71C737FF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{60AD178F-3609-4A8A-8C74-592FC112D0ED} = {9600BD14-0E72-43E1-A7A8-E952084337A8}
@@ -75,5 +80,6 @@ Global
 		{662F944F-BEE9-40BE-81B4-3EA490729CF0} = {9600BD14-0E72-43E1-A7A8-E952084337A8}
 		{8CFDCF13-34C0-4D84-AE63-3D9372DE765B} = {9600BD14-0E72-43E1-A7A8-E952084337A8}
 		{6578A617-5A45-47AE-A023-315A5E0CB83F} = {9600BD14-0E72-43E1-A7A8-E952084337A8}
+		{6D8904F4-7955-468A-87BB-04EF71C737FF} = {9600BD14-0E72-43E1-A7A8-E952084337A8}
 	EndGlobalSection
 EndGlobal
