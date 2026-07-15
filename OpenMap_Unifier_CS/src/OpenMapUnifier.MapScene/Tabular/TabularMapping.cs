@@ -17,6 +17,12 @@ public enum FieldRole
     Yaw,
     Pitch,
     Roll,
+    /// <summary>Attitude quaternion components (body→ENU, see docs). When all
+    /// four are mapped they win over Euler columns.</summary>
+    QuatX,
+    QuatY,
+    QuatZ,
+    QuatW,
     /// <summary>Any numeric column worth keeping — lands in TrajectorySample.Extra.</summary>
     Extra,
 }

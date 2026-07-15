@@ -90,6 +90,10 @@ public static class TrajectoryLoader
         "yaw" or "heading" or "hdg" or "psi" or "course" => FieldRole.Yaw,
         "pitch" or "theta" or "nick" => FieldRole.Pitch,
         "roll" or "phi" or "bank" => FieldRole.Roll,
+        "qx" or "quatx" or "quat_x" or "q1" => FieldRole.QuatX,
+        "qy" or "quaty" or "quat_y" or "q2" => FieldRole.QuatY,
+        "qz" or "quatz" or "quat_z" or "q3" => FieldRole.QuatZ,
+        "qw" or "quatw" or "quat_w" or "q0" => FieldRole.QuatW,
         _ => FieldRole.Ignore,
     };
 
@@ -109,6 +113,9 @@ public static class TrajectoryLoader
         var yawCol = mapping.ColumnFor(FieldRole.Yaw);
         var pitchCol = mapping.ColumnFor(FieldRole.Pitch);
         var rollCol = mapping.ColumnFor(FieldRole.Roll);
+        var quatCols = (X: mapping.ColumnFor(FieldRole.QuatX), Y: mapping.ColumnFor(FieldRole.QuatY),
+            Z: mapping.ColumnFor(FieldRole.QuatZ), W: mapping.ColumnFor(FieldRole.QuatW));
+        var hasQuat = quatCols is { X: not null, Y: not null, Z: not null, W: not null };
         var extraCols = mapping.Fields.Where(kv => kv.Value == FieldRole.Extra).Select(kv => kv.Key).ToArray();
 
         // First pass: positions in UTM to place the anchor at the path center.
@@ -144,13 +151,25 @@ public static class TrajectoryLoader
                 if (row.TryGetValue(c, out var v))
                     (extra ??= new Dictionary<string, double>())[c] = v;
 
+            System.Numerics.Quaternion? orientation = null;
+            float yaw = Angle(row, yawCol, mapping),
+                pitch = Angle(row, pitchCol, mapping),
+                roll = Angle(row, rollCol, mapping);
+            if (hasQuat &&
+                row.TryGetValue(quatCols.X!, out var qx) && row.TryGetValue(quatCols.Y!, out var qy) &&
+                row.TryGetValue(quatCols.Z!, out var qz) && row.TryGetValue(quatCols.W!, out var qw))
+            {
+                orientation = System.Numerics.Quaternion.Normalize(
+                    new System.Numerics.Quaternion((float)qx, (float)qy, (float)qz, (float)qw));
+                (yaw, pitch, roll) = SensorModel.ToEuler(orientation.Value);
+            }
+
             samples.Add(new TrajectorySample(
                 time,
                 anchor.ToLocal(new UtmPoint(positions[i].E, positions[i].N), positions[i].Z),
-                Angle(row, yawCol, mapping),
-                Angle(row, pitchCol, mapping),
-                Angle(row, rollCol, mapping),
-                extra));
+                yaw, pitch, roll,
+                extra,
+                orientation));
         }
         return new Trajectory(anchor, samples);
 

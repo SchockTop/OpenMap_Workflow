@@ -44,10 +44,12 @@ everything an interface-sized building block.
 | `RasterLayer` | classification raster; `ClassAt` (nearest-neighbor, never interpolated) |
 | `Trajectory` / `TrajectorySample` | time-stamped poses, interpolation, fixed-rate `Frames()` |
 | `TabularMapping` + `TrajectoryLoader` | CSV/JSON → trajectory with user-defined column mapping; `SuggestMapping` proposes one |
-| `Sensor` | FOV + mount angles on the body; boresight and frustum rays per pose |
+| `SensorModel` family | `PyramidSensor` (camera frustum), `ConeSensor` (circular FOV), `CylinderSensor` (fixed ground radius); mount angles on the body, boresight + ray bundle per pose |
 | `LineOfSight` | ray-march the terrain: `HitGround`, `CanSee`, `BoresightGroundPoint` |
 | `GroundMask` | areas on the ground: by polygon, by condition, by class, by object height (nDSM); set algebra + `Dilate` |
 | `CoverageAnalyzer` | ground actually seen by a sensor along the whole flight (occlusion-aware) |
+| `PointSet` + `UnityPointsExport` | points you set (markers, trajectory, boresight track) → JSON render targets for Unity |
+| `SceneDocument` + `SceneRunner` | the whole session as one JSON file, executed by `openmap scene` |
 | `GeoTiffWriter` (in Raster) | write masks/terrain as georeferenced GeoTIFF for QGIS/Blender |
 
 ## A complete session
@@ -68,7 +70,7 @@ mapping.Fields["speed"] = FieldRole.Extra;
 var flight = TrajectoryLoader.LoadCsv("flight.csv", mapping, map.Anchor);
 
 // 3. Sensor & per-frame looking point.
-var camera = new Sensor("nadir", FovHorizontalDeg: 60, FovVerticalDeg: 45,
+var camera = new PyramidSensor("nadir", FovHorizontalDeg: 60, FovVerticalDeg: 45,
     MountPitchDeg: -90);
 foreach (var pose in flight.Frames(1.0))
 {
@@ -85,6 +87,13 @@ Console.WriteLine($"covered: {seenOpenGround.AreaSquareMeters() / 1e6:F2} km²")
 
 // 5. Hand off to any GIS/3D tool.
 seenOpenGround.SaveGeoTiff("coverage.tif");
+
+// 6. Render targets for the Unity project.
+var targets = new PointSet(map.Anchor)
+    .Add("landmark", new UtmPoint(691_607.86, 5_334_760.39), z: 520, tag: "poi")
+    .AddTrajectory(flight, stepSeconds: 1)
+    .AddBoresightTrack(flight, camera, map.LineOfSight, stepSeconds: 1);
+UnityPointsExport.WriteFile("points.json", targets);
 ```
 
 ## Conventions (read once, save hours)
@@ -100,20 +109,116 @@ seenOpenGround.SaveGeoTiff("coverage.tif");
 - **NoData**: outside coverage, `HeightAt` returns null and rays terminate —
   no silent zeros.
 
-## Open questions (waiting on your input)
+## Sensors
 
-1. **Rendering target.** Masks/terrain export as GeoTIFF and trajectories as
-   CSV today. What does your 3D viewer want — glTF meshes, Blender-python
-   handoff (the existing pipeline), or a Unity-style stream? That decides the
-   next export module.
-2. **Rotation source of truth.** Yaw/pitch/roll (aerospace, current) or
-   quaternions in your logs? Both can be mapped; the interpolation should
-   match what your instruments emit.
-3. **Sensor models.** Rectangular frustum is in. Conical (spinning LiDAR),
-   side-looking with squint, or gimbal-driven (mount angles from CSV columns)?
-   All are small extensions of `Sensor`.
-4. **Scene document.** A JSON project file ("region + layers + trajectory +
-   mapping + analyses + outputs") that one CLI command executes is sketched
-   but not built — worth it once the interactive workflow settles. Same for
-   per-frame outputs (looking-point track as CSV/GeoJSON) — trivial to add,
-   tell me which columns you want.
+All sensors share `SensorModel`: a name, `MaxRangeMeters`, and mount angles
+that attach the device rigidly to the body (`MountPitchDeg: -90` = looking
+straight down, the default). Each shape only defines the ray bundle it emits
+(`Rays(pose, quality)` — a `SensorRay` carries origin + direction), so LOS
+and coverage work identically for every shape and new ones are one small
+record:
+
+| Sensor | Shape | Knobs |
+|---|---|---|
+| `PyramidSensor` | rectangular frustum — the classic camera/imager | `FovHorizontalDeg`, `FovVerticalDeg` |
+| `ConeSensor` | circular FOV around the boresight — spot sensors, conical scanners | `HalfAngleDeg` |
+| `CylinderSensor` | fixed ground radius under the platform, independent of altitude — downward radar / proximity | `RadiusMeters` (mount angles ignored; sampled as parallel vertical rays, `MaxRangeMeters` = depth) |
+
+`quality` scales ray density (pyramid: rays across ≈ quality; cone/cylinder:
+rings ≈ quality/3 with circumference-proportional counts). Denser = finer
+footprint, linearly slower.
+
+## Rotation data: "could be anything and everything"
+
+Both attitude representations are first-class:
+
+- **Euler columns** — map `Yaw`/`Pitch`/`Roll` roles (aerospace convention;
+  radians via `AngleToDegrees = 180/Math.PI`).
+- **Quaternion columns** — map `QuatX/Y/Z/W`; when all four are present they
+  *win* over Euler columns. The quaternion is the body→ENU rotation, is
+  normalized on load, kept exactly on `TrajectorySample.Orientation`
+  (interpolation uses `Quaternion.Slerp`), and the Euler fields are derived
+  from it for display. `SuggestMapping` recognizes `qx/qy/qz/qw`,
+  `quat_x`…, and scalar-first `q0..q3` column names.
+
+Anything stranger (rotation matrices, axis-angle) → convert to a quaternion
+in a pre-pass, or ask for a loader extension.
+
+## Unity render-target export
+
+`UnityPointsExport` writes a `PointSet` as JSON that `JsonUtility` can
+deserialize directly (flat fields, no dictionaries):
+
+```jsonc
+{
+  "anchor": {                     // place one GameObject here = world origin
+    "utmEasting": 691607.86, "utmNorthing": 5334760.39,
+    "utmZone": 32, "epsg": 25832,
+    "latitude": 48.13711, "longitude": 11.57538,
+    "frame": "local ENU meters; unity = (east, up, north), left-handed Y-up"
+  },
+  "points": [{
+    "name": "boresight_0", "tag": "boresight",
+    "x": 12.3, "y": -4.5, "z": 520.0,          // ENU (X east, Y north, Z up)
+    "unityX": 12.3, "unityY": 520.0, "unityZ": -4.5,   // assign verbatim
+    "unityEulerX": 15.0, "unityEulerY": 90.0, "unityEulerZ": -5.0
+  }]
+}
+```
+
+Axis handover: ENU is right-handed Z-up, Unity is left-handed Y-up, so
+`unity = (east, up, north)` and `unityEuler = (−pitch, yaw, −roll)` for
+`Transform.eulerAngles`. Both coordinate sets are in the file so nothing is
+lost if your importer prefers to do the swap itself.
+
+## The scene document (`openmap scene file.json`)
+
+The whole session above as one declarative JSON file — same building blocks,
+no C# required. Paths are relative to the document. `SceneRunner.RunAsync`
+is the library entry if you want it inside your own tool.
+
+```jsonc
+{
+  "map": {
+    // offline:  "terrainFile": "terrain.tif", "surfaceFile": "surface.tif"
+    "state": "by",
+    "bbox": [689600, 5332800, 693600, 5336800],
+    "cache": "tilecache",
+    "surfaceModel": true,
+    "classificationFile": "classes.tif"      // optional
+  },
+  "trajectory": {
+    "file": "flight.csv",
+    "mapping": {                              // omit to auto-suggest
+      "fields": { "time": "Time", "easting": "X", "northing": "Y",
+                  "alt": "Z", "heading": "Yaw" },
+      "positionEpsg": 25832
+    }
+  },
+  "sensor": {
+    "type": "pyramid",                        // pyramid | cone | cylinder
+    "name": "cam", "mountPitchDeg": -90,
+    "fovHorizontalDeg": 60, "fovVerticalDeg": 45
+  },
+  "areas": [
+    { "name": "nearTrees", "objectsTallerThan": 3, "dilateMeters": 5,
+      "geoTiff": "near_trees.tif" }
+  ],
+  "outputs": {
+    "coverageGeoTiff": "coverage.tif", "frameStepSeconds": 1, "quality": 32,
+    "unityPoints": "points.json", "pointStepSeconds": 1,
+    "includeTrajectory": true, "includeBoresight": true
+  }
+}
+```
+
+## Decisions log (was: open questions)
+
+1. **Rendering target** — no Blender/glTF integration for now; the one
+   export is Unity render-target points (`UnityPointsExport`). Masks/terrain
+   still go out as GeoTIFF for GIS tools.
+2. **Rotation source** — both Euler and quaternions, quaternions win when
+   present (see above).
+3. **Sensor models** — the typical three: pyramid / cone (level) / cylinder.
+   Gimbal-from-columns and squint remain easy extensions of `SensorModel`.
+4. **Scene document** — built (`openmap scene`), see above.

@@ -7,7 +7,9 @@ namespace OpenMapUnifier.MapScene;
 /// One time-stamped pose. Position is scene-local ENU (X east, Y north,
 /// Z up, meters above sea level); attitude is aerospace-style: yaw = heading
 /// in degrees clockwise from north, pitch up positive, roll right-wing-down
-/// positive. Extra columns from the source file ride along in
+/// positive. When the source log carries quaternions, <see cref="Orientation"/>
+/// holds the exact body→ENU rotation (Euler fields are derived from it) and
+/// wins wherever both exist. Extra columns from the source file ride along in
 /// <see cref="Extra"/> so downstream tools lose nothing.
 /// </summary>
 public sealed record TrajectorySample(
@@ -16,7 +18,13 @@ public sealed record TrajectorySample(
     float YawDeg,
     float PitchDeg,
     float RollDeg,
-    IReadOnlyDictionary<string, double>? Extra = null);
+    IReadOnlyDictionary<string, double>? Extra = null,
+    Quaternion? Orientation = null)
+{
+    /// <summary>The body→ENU rotation, from the quaternion when present.</summary>
+    public Quaternion BodyOrientation =>
+        Orientation ?? SensorModel.BodyRotation(YawDeg, PitchDeg, RollDeg);
+}
 
 /// <summary>
 /// A time-ordered path through the scene with pose interpolation — the
@@ -55,12 +63,17 @@ public sealed class Trajectory
         var b = _samples[hi];
         var t = (float)((time - a.Time) / (b.Time - a.Time));
 
+        Quaternion? orientation = a.Orientation is { } qa && b.Orientation is { } qb
+            ? Quaternion.Slerp(qa, qb, t)
+            : null;
+
         return new TrajectorySample(
             time,
             Vector3.Lerp(a.Position, b.Position, t),
             LerpAngle(a.YawDeg, b.YawDeg, t),
             float.Lerp(a.PitchDeg, b.PitchDeg, t),
-            LerpAngle(a.RollDeg, b.RollDeg, t));
+            LerpAngle(a.RollDeg, b.RollDeg, t),
+            Orientation: orientation);
     }
 
     /// <summary>Poses at a fixed rate — the per-frame view for analyses and rendering.</summary>

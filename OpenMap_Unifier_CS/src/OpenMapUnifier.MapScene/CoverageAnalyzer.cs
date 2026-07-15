@@ -21,31 +21,29 @@ public sealed class CoverageAnalyzer
     }
 
     /// <summary>Ground seen by the sensor over the whole trajectory.</summary>
-    public GroundMask SeenGround(Trajectory trajectory, Sensor sensor,
-        double frameStepSeconds = 1.0, int raysAcross = 32, int raysDown = 24)
+    public GroundMask SeenGround(Trajectory trajectory, SensorModel sensor,
+        double frameStepSeconds = 1.0, int quality = 32)
     {
         var mask = new GroundMask(_terrain);
         foreach (var pose in trajectory.Frames(frameStepSeconds))
-            MarkFrame(mask, sensor, pose, raysAcross, raysDown);
+            MarkFrame(mask, sensor, pose, quality);
         return mask;
     }
 
     /// <summary>Ground seen in a single frame (footprint with occlusion).</summary>
-    public GroundMask Footprint(Sensor sensor, TrajectorySample pose,
-        int raysAcross = 64, int raysDown = 48)
+    public GroundMask Footprint(SensorModel sensor, TrajectorySample pose, int quality = 64)
     {
         var mask = new GroundMask(_terrain);
-        MarkFrame(mask, sensor, pose, raysAcross, raysDown);
+        MarkFrame(mask, sensor, pose, quality);
         return mask;
     }
 
-    private void MarkFrame(GroundMask mask, Sensor sensor, TrajectorySample pose,
-        int raysAcross, int raysDown)
+    private void MarkFrame(GroundMask mask, SensorModel sensor, TrajectorySample pose, int quality)
     {
         var grid = _terrain.Grid;
-        foreach (var ray in sensor.FrustumRays(pose, raysAcross, raysDown))
+        foreach (var ray in sensor.Rays(pose, quality))
         {
-            var hit = _lineOfSight.HitGround(pose.Position, ray, sensor.MaxRangeMeters);
+            var hit = _lineOfSight.HitGround(ray.Origin, ray.Direction, sensor.MaxRangeMeters);
             if (hit is null) continue;
             var utm = _anchor.ToUtm(hit.Value);
             var col = (int)((utm.Easting - grid.OriginEasting) / grid.PixelSize);

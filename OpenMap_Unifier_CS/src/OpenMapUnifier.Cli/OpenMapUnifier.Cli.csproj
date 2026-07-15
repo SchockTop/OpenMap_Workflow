@@ -8,5 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="../OpenMapUnifier.Import/OpenMapUnifier.Import.csproj" />
     <ProjectReference Include="../OpenMapUnifier.Germany/OpenMapUnifier.Germany.csproj" />
+    <ProjectReference Include="../OpenMapUnifier.MapScene/OpenMapUnifier.MapScene.csproj" />
   </ItemGroup>
 </Project>

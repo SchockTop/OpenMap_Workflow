@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenMapUnifier.Geodesy;
 using OpenMapUnifier.MapScene;
+using OpenMapUnifier.MapScene.Scene;
 using OpenMapUnifier.MapScene.Tabular;
 using OpenMapUnifier.Raster;
 using Xunit;
@@ -123,10 +124,10 @@ public class MapSceneTests
         // 20 degrees down: the ridge shadows the ground behind it.
         var pose = new TrajectorySample(0,
             anchor.ToLocal(new UtmPoint(500_040, 5_400_100), z: 130), YawDeg: 90, PitchDeg: 0, RollDeg: 0);
-        var sensor = new Sensor("cam", FovHorizontalDeg: 40, FovVerticalDeg: 30,
+        var sensor = new PyramidSensor("cam", FovHorizontalDeg: 40, FovVerticalDeg: 30,
             MaxRangeMeters: 400, MountPitchDeg: -20);
 
-        var seen = coverage.Footprint(sensor, pose, raysAcross: 60, raysDown: 40);
+        var seen = coverage.Footprint(sensor, pose, quality: 60);
 
         Assert.True(seen.CellCount() > 0);
         // Ground shadowed by the ridge (east of it, low) must NOT be seen.
@@ -215,17 +216,223 @@ public class MapSceneTests
     public void Sensor_DownLookingCameraPointsDown()
     {
         var pose = new TrajectorySample(0, Vector3.Zero, YawDeg: 0, PitchDeg: 0, RollDeg: 0);
-        var sensor = new Sensor("nadir", MountPitchDeg: -90);
+        var sensor = new PyramidSensor("nadir", MountPitchDeg: -90);
         var boresight = sensor.BoresightFor(pose);
         Assert.Equal(-1, boresight.Z, 3);
 
         // Forward-looking camera on a north-heading body looks north.
-        var forward = new Sensor("front", MountPitchDeg: 0);
+        var forward = new PyramidSensor("front", MountPitchDeg: 0);
         var dir = forward.BoresightFor(pose);
         Assert.Equal(1, dir.Y, 3);
 
         // Heading east turns it east.
         var east = forward.BoresightFor(pose with { YawDeg = 90 });
         Assert.Equal(1, east.X, 3);
+    }
+
+    [Fact]
+    public void SensorModel_EulerRoundTripsThroughQuaternion()
+    {
+        foreach (var (yaw, pitch, roll) in new[]
+                 { (0f, 0f, 0f), (90f, 0f, 0f), (45f, -30f, 10f), (200f, 15f, -25f) })
+        {
+            var (y, p, r) = SensorModel.ToEuler(SensorModel.BodyRotation(yaw, pitch, roll));
+            Assert.Equal(yaw, ((y % 360) + 360) % 360, 3);
+            Assert.Equal(pitch, p, 3);
+            Assert.Equal(roll, r, 3);
+        }
+    }
+
+    [Fact]
+    public void Trajectory_SlerpsQuaternionAttitude()
+    {
+        var anchor = new SceneAnchor(new UtmPoint(500_000, 5_400_000));
+        var trajectory = new Trajectory(anchor, new[]
+        {
+            new TrajectorySample(0, new Vector3(0, 0, 100), 0, 0, 0,
+                Orientation: SensorModel.BodyRotation(0, 0, 0)),
+            new TrajectorySample(10, new Vector3(100, 0, 100), 90, 0, 0,
+                Orientation: SensorModel.BodyRotation(90, 0, 0)),
+        });
+
+        var mid = trajectory.At(5);
+        Assert.NotNull(mid.Orientation);
+        var (yaw, pitch, roll) = SensorModel.ToEuler(mid.BodyOrientation);
+        Assert.Equal(45, yaw, 3);
+        Assert.Equal(0, pitch, 3);
+        Assert.Equal(0, roll, 3);
+    }
+
+    [Fact]
+    public void TrajectoryLoader_QuaternionColumnsWinOverEuler()
+    {
+        var dir = Directory.CreateTempSubdirectory("mapscene-");
+        try
+        {
+            var csv = Path.Combine(dir.FullName, "quat.csv");
+            // First row's quaternion = BodyRotation(90, 0, 0): a 90° right turn.
+            File.WriteAllLines(csv, new[]
+            {
+                "time,x,y,z,yaw,qx,qy,qz,qw",
+                "0,691000,5334000,520,7,0,0,-0.70710678,0.70710678",
+                "10,691100,5334000,540,7,0,0,0,1",
+            });
+
+            var mapping = TrajectoryLoader.SuggestMapping(csv);
+            Assert.Equal(FieldRole.QuatX, mapping.Fields["qx"]);
+            Assert.Equal(FieldRole.QuatW, mapping.Fields["qw"]);
+
+            var trajectory = TrajectoryLoader.LoadCsv(csv, mapping);
+            Assert.NotNull(trajectory.Samples[0].Orientation);
+            // Euler derived from the quaternion, not the bogus yaw column.
+            Assert.Equal(90, trajectory.Samples[0].YawDeg, 3);
+            Assert.Equal(0, trajectory.Samples[1].YawDeg, 3);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ConeSensor_FootprintIsDiscOfExpectedRadius()
+    {
+        var terrain = MakeRidgeTerrain();
+        var anchor = AnchorOf(terrain);
+        var coverage = new CoverageAnalyzer(terrain, anchor);
+
+        // 30 m above the flat plain, looking straight down with 20° half-angle:
+        // ground radius = 30 * tan(20°) ≈ 10.9 m.
+        var center = new UtmPoint(500_040, 5_400_100);
+        var pose = new TrajectorySample(0, anchor.ToLocal(center, z: 130), 0, 0, 0);
+        var sensor = new ConeSensor("spot", HalfAngleDeg: 20, MaxRangeMeters: 200);
+
+        var seen = coverage.Footprint(sensor, pose, quality: 90);
+
+        Assert.True(seen.Contains(new UtmPoint(500_040.5, 5_400_100.5)));
+        Assert.InRange(MaxDistanceFrom(seen, center), 9.0, 11.8);
+    }
+
+    [Fact]
+    public void CylinderSensor_GroundRadiusIndependentOfAltitude()
+    {
+        var terrain = MakeRidgeTerrain();
+        var anchor = AnchorOf(terrain);
+        var coverage = new CoverageAnalyzer(terrain, anchor);
+        var sensor = new CylinderSensor("radar", RadiusMeters: 15);
+        var center = new UtmPoint(500_040, 5_400_100);
+
+        foreach (var altitude in new[] { 130.0, 180.0 })
+        {
+            var pose = new TrajectorySample(0, anchor.ToLocal(center, z: altitude), 0, 0, 0);
+            var seen = coverage.Footprint(sensor, pose, quality: 90);
+            Assert.True(seen.Contains(new UtmPoint(500_040.5, 5_400_100.5)));
+            Assert.InRange(MaxDistanceFrom(seen, center), 13.0, 16.5);
+        }
+    }
+
+    private static double MaxDistanceFrom(GroundMask mask, UtmPoint center)
+    {
+        var max = 0.0;
+        for (var row = 0; row < mask.Height; row++)
+            for (var col = 0; col < mask.Width; col++)
+                if (mask[row, col])
+                    max = Math.Max(max, mask.CellCenter(row, col).DistanceTo(center));
+        return max;
+    }
+
+    [Fact]
+    public void UnityPointsExport_CarriesAnchorAndUnityAxes()
+    {
+        var anchor = new SceneAnchor(new UtmPoint(691_000, 5_334_000));
+        var points = new PointSet(anchor)
+            .Add(new ScenePoint("target", new Vector3(10, 20, 30),
+                YawDeg: 90, PitchDeg: -15, RollDeg: 5, Tag: "render"));
+
+        using var doc = System.Text.Json.JsonDocument.Parse(UnityPointsExport.Write(points));
+        var root = doc.RootElement;
+
+        var a = root.GetProperty("anchor");
+        Assert.Equal(691_000, a.GetProperty("utmEasting").GetDouble(), 3);
+        Assert.Equal(25832, a.GetProperty("epsg").GetInt32());
+        Assert.InRange(a.GetProperty("latitude").GetDouble(), 47, 49);
+
+        var p = root.GetProperty("points")[0];
+        Assert.Equal("target", p.GetProperty("name").GetString());
+        // ENU (x east, y north, z up) → Unity left-handed Y-up: (east, up, north).
+        Assert.Equal(10, p.GetProperty("unityX").GetDouble(), 3);
+        Assert.Equal(30, p.GetProperty("unityY").GetDouble(), 3);
+        Assert.Equal(20, p.GetProperty("unityZ").GetDouble(), 3);
+        Assert.Equal(15, p.GetProperty("unityEulerX").GetDouble(), 3);
+        Assert.Equal(90, p.GetProperty("unityEulerY").GetDouble(), 3);
+        Assert.Equal(-5, p.GetProperty("unityEulerZ").GetDouble(), 3);
+    }
+
+    [Fact]
+    public void PointSet_BoresightTrackFollowsTheGround()
+    {
+        var terrain = MakeRidgeTerrain();
+        var anchor = AnchorOf(terrain);
+        var los = new LineOfSight(terrain, anchor);
+        var trajectory = new Trajectory(anchor, new[]
+        {
+            new TrajectorySample(0, anchor.ToLocal(new UtmPoint(500_020, 5_400_100), z: 160), 0, 0, 0),
+            new TrajectorySample(10, anchor.ToLocal(new UtmPoint(500_060, 5_400_100), z: 160), 0, 0, 0),
+        });
+        var nadir = new PyramidSensor("nadir");
+
+        var points = new PointSet(anchor)
+            .AddBoresightTrack(trajectory, nadir, los, stepSeconds: 5);
+
+        Assert.Equal(3, points.Points.Count);
+        // Straight-down looks hit the plain at 100 m under each pose.
+        foreach (var p in points.Points)
+            Assert.Equal(100, p.Position.Z, 0.5);
+    }
+
+    [Fact]
+    public async Task SceneDocument_RunsEndToEndFromFiles()
+    {
+        var dir = Directory.CreateTempSubdirectory("mapscene-");
+        try
+        {
+            GeoTiffWriter.Write(Path.Combine(dir.FullName, "terrain.tif"), MakeRidgeTerrain().Grid);
+            File.WriteAllLines(Path.Combine(dir.FullName, "flight.csv"), new[]
+            {
+                "time,easting,northing,alt,heading",
+                "0,500020,5400100,160,90",
+                "10,500060,5400100,160,90",
+            });
+            File.WriteAllText(Path.Combine(dir.FullName, "scene.json"), """
+                {
+                  "map": { "terrainFile": "terrain.tif" },
+                  "trajectory": { "file": "flight.csv" },
+                  "sensor": { "type": "cone", "name": "spot", "halfAngleDeg": 25, "maxRangeMeters": 300 },
+                  "outputs": {
+                    "coverageGeoTiff": "coverage.tif",
+                    "unityPoints": "points.json",
+                    "pointStepSeconds": 5
+                  }
+                }
+                """);
+
+            var doc = SceneDocument.Load(Path.Combine(dir.FullName, "scene.json"));
+            var messages = new List<string>();
+            var written = await SceneRunner.RunAsync(doc, dir.FullName, messages.Add);
+
+            Assert.Equal(2, written.Count);
+            var coverage = GeoTiffReader.Read(Path.Combine(dir.FullName, "coverage.tif"));
+            Assert.Contains(coverage.Data, v => v == 1f);
+
+            using var points = System.Text.Json.JsonDocument.Parse(
+                File.ReadAllText(Path.Combine(dir.FullName, "points.json")));
+            // 3 trajectory points + 3 boresight hits at 5 s steps over 10 s.
+            Assert.Equal(6, points.RootElement.GetProperty("points").GetArrayLength());
+            Assert.Contains(messages, m => m.StartsWith("Coverage:"));
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
     }
 }

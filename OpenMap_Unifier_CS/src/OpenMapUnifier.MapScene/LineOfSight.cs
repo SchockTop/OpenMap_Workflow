@@ -82,6 +82,6 @@ public sealed class LineOfSight
     /// Ground point the sensor boresight looks at for a pose — "where is it
     /// looking this frame". Null when looking above the horizon / off-map.
     /// </summary>
-    public Vector3? BoresightGroundPoint(Sensor sensor, TrajectorySample pose) =>
+    public Vector3? BoresightGroundPoint(SensorModel sensor, TrajectorySample pose) =>
         HitGround(pose.Position, sensor.BoresightFor(pose), sensor.MaxRangeMeters);
 }

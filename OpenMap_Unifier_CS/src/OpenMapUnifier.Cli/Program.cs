@@ -21,6 +21,7 @@ try
         "convert" => Convert_(args),
         "detect" => Detect(args),
         "import-json" => ImportJson(args),
+        "scene" => await Scene(args),
         "proxy-test" => await ProxyTest(args),
         _ => Help(),
     };
@@ -57,6 +58,9 @@ static int Help()
           openmap import-json <file> [--to <epsg>] [--out <file.geojson>]
                    [--assume-epsg <epsg>] [--min-confidence 0.6] [--region germany|central-europe]
                                             recover coordinates from messy JSON, any format mix
+          openmap scene <scene.json>        run a MapScene document: map + trajectory + sensor
+                                            -> coverage GeoTIFFs, area masks, Unity point exports
+                                            (format: docs/mapscene.md)
           openmap proxy-test [proxy options]
 
         Known EPSG codes: 4326, 25832/25833 (ETRS89 UTM), 32632/32633 (WGS84 UTM),
@@ -306,6 +310,17 @@ static int ImportJson(string[] args)
         OpenMapUnifier.Import.NormalizedGeoJson.WriteFile(outPath, found, targetEpsg);
         Console.WriteLine($"Normalized GeoJSON written to {outPath}");
     }
+    return 0;
+}
+
+static async Task<int> Scene(string[] args)
+{
+    var file = Require(args, 1, "scene JSON file");
+    var doc = OpenMapUnifier.MapScene.Scene.SceneDocument.Load(file);
+    var baseDir = Path.GetDirectoryName(Path.GetFullPath(file)) ?? ".";
+    var written = await OpenMapUnifier.MapScene.Scene.SceneRunner.RunAsync(
+        doc, baseDir, Console.WriteLine);
+    Console.WriteLine($"{written.Count} output file(s) written.");
     return 0;
 }
 
