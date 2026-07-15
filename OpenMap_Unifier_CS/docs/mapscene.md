@@ -218,13 +218,14 @@ is the library entry if you want it inside your own tool.
 
 `"unityScene"` writes a complete viewer bundle: manifest + raw heightmap +
 overlay PNGs (coverage is added automatically when trajectory + sensor are
-present) + trajectory + points. Copy the `Assets/OpenMap` folder from
-[unity/OpenMapViewer](../unity/OpenMapViewer/README.md) into any Unity
-project (no packages needed), point the `OpenMapSceneLoader` component at
-the bundle, press Play — terrain, flight playback with timeline, live sensor
-frustum + boresight ground point, overlay toggles and point markers, all
-interactive. `UnitySceneExport.Write(...)` is the same thing as a library
-call.
+present) + trajectory + points.
+[unity/OpenMapViewer](../unity/OpenMapViewer/README.md) is a **ready-to-open
+Unity project** (no packages): add it in Unity Hub, press Play — a built-in
+demo scene loads immediately, and the HUD's bundle picker opens any exported
+bundle without leaving Play mode. Terrain, flight playback with timeline,
+live sensor frustum + boresight ground point in UTM, overlay legend with
+toggles, point markers, screenshots — all interactive.
+`UnitySceneExport.Write(...)` is the same export as a library call.
 
 ## Decisions log (was: open questions)
 

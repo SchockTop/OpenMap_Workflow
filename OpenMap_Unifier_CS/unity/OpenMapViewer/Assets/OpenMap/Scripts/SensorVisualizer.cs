@@ -15,6 +15,11 @@ namespace OpenMapViewer
         public ManifestSensor sensor;
         public bool show = true;
 
+        /// <summary>Whether the boresight hit the ground this frame.</summary>
+        public bool HasHit { get; private set; }
+        /// <summary>Ground point the sensor looks at (Unity/world coordinates).</summary>
+        public Vector3 HitPoint { get; private set; }
+
         private Mesh _lines;
         private readonly List<Vector3> _vertices = new List<Vector3>();
         private readonly List<Color> _colors = new List<Color>();
@@ -50,6 +55,7 @@ namespace OpenMapViewer
             _renderer.enabled = active;
             if (!active)
             {
+                HasHit = false;
                 if (_hitMarker != null) _hitMarker.gameObject.SetActive(false);
                 return;
             }
@@ -141,6 +147,8 @@ namespace OpenMapViewer
             Vector3 dir = rot * Vector3.forward;
             RaycastHit hit;
             bool hasHit = Physics.Raycast(pos, dir, out hit, range);
+            HasHit = hasHit;
+            if (hasHit) HitPoint = hit.point;
             Vector3 end = hasHit ? hit.point : pos + dir * range;
             AddLine(pos, end, BoresightColor);
 

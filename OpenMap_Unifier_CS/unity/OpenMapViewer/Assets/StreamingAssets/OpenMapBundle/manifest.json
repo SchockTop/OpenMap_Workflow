@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "anchor": {
+    "utmEasting": 500100,
+    "utmNorthing": 5400100,
+    "utmZone": 32,
+    "epsg": 25832,
+    "latitude": 48.7539126,
+    "longitude": 9.0013605
+  },
+  "terrain": {
+    "heightsFile": "terrain_heights.r32",
+    "width": 200,
+    "height": 200,
+    "pixelSize": 1,
+    "originX": -99.5,
+    "originZTop": 99.5,
+    "minHeight": 100,
+    "maxHeight": 140,
+    "orthoFile": ""
+  },
+  "overlays": [
+    {
+      "name": "coverage",
+      "file": "overlay_coverage.png",
+      "r": 46,
+      "g": 204,
+      "b": 113,
+      "visibleByDefault": true
+    }
+  ],
+  "trajectoryFile": "trajectory.json",
+  "pointsFile": "points.json",
+  "sensor": {
+    "type": "pyramid",
+    "name": "cam",
+    "maxRangeMeters": 500,
+    "mountYawDeg": 0,
+    "mountPitchDeg": -35,
+    "mountRollDeg": 0,
+    "fovHorizontalDeg": 50,
+    "fovVerticalDeg": 35,
+    "halfAngleDeg": 0,
+    "radiusMeters": 0
+  }
+}

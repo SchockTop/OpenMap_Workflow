@@ -1,0 +1,11 @@
+# Unity generates these when the project is opened; never commit them.
+Library/
+Temp/
+Logs/
+obj/
+UserSettings/
+MemoryCaptures/
+Build/
+Builds/
+*.csproj
+*.sln

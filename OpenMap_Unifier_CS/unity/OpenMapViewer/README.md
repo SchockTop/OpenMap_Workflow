@@ -1,20 +1,48 @@
 # OpenMap Unity Viewer
 
-Interactive 3D visualization of OpenMapUnifier scenes inside Unity — terrain,
-flight trajectory playback, live sensor frustum with boresight ground point,
-coverage/area overlays and render-target points. Pure C# scripts on Unity's
-built-in APIs: **no packages, no store assets, nothing to download.**
+A **complete, ready-to-open Unity project** for interactive 3D visualization
+of OpenMapUnifier scenes: terrain, flight trajectory playback with a
+timeline, live sensor frustum with boresight ground point, coverage/area
+overlays and render-target points. Pure C# on Unity's built-in APIs —
+**no packages, no store assets, nothing downloaded.**
 
-## Setup (once, ~2 minutes)
+## Open it (2 minutes, no assembly)
 
-1. Create a normal Unity project (Unity Hub → New project → **3D (Built-in)**,
-   any Unity 2021.3 LTS or newer).
-2. Copy the `Assets/OpenMap` folder from here into your project's `Assets/`.
-3. Done. No packages, no project settings to touch.
+1. Unity Hub → **Add** → **Add project from disk** → select this folder
+   (`unity/OpenMapViewer`).
+2. Open it with any **Unity 2021.3 LTS or newer** (it will offer to upgrade —
+   accept). Use the **3D / Built-in** render pipeline default.
+3. Press **Play**. That's it — a demo scene (ridge terrain, orbiting camera
+   flight, sensor frustum, coverage overlay) loads from
+   `Assets/StreamingAssets/OpenMapBundle` so you immediately see everything
+   working.
 
-## Produce a scene bundle (framework side)
+No scene setup is needed: `OpenMapBootstrap` starts the viewer in whatever
+scene is open, and the HUD does the rest.
 
-Add `"unityScene"` to the outputs of your scene document and run it:
+## The UI
+
+**Bundle picker** (shown when no bundle is found, or via *Load bundle…*):
+paste or browse to any bundle folder and press *Load scene* — also works
+mid-Play, no restart. The last-used bundle is remembered.
+
+**Control panel** (left side):
+
+| Section | What it does |
+|---|---|
+| Header | scene origin (lat/lon, EPSG), scale note |
+| Flight playback | Play/Pause (or Space), timeline scrubbing, speed 0.5–25x, loop, follow-camera |
+| Aircraft | live UTM position, altitude, yaw/pitch/roll |
+| Sensor | wireframe on/off; live boresight ground point in UTM |
+| Ground overlays | color legend + per-overlay toggle (coverage, areas) |
+| Buttons | *Load bundle…*, *Screenshot* (saved under `persistentDataPath/OpenMapScreenshots`) |
+
+Camera: **RMB** orbit · **MMB** pan · **scroll** zoom · **F** frame terrain ·
+**Space** play/pause.
+
+## Feed it your own scenes
+
+Add `"unityScene"` to the outputs of a scene document and run it:
 
 ```jsonc
 // demo.json
@@ -33,56 +61,41 @@ Add `"unityScene"` to the outputs of your scene document and run it:
 openmap scene demo.json
 ```
 
-That writes `unity_bundle/` with `manifest.json`, the raw heightmap, overlay
-PNGs (coverage is added automatically when a trajectory + sensor exist),
-`trajectory.json` and `points.json`. Or call `UnitySceneExport.Write(...)`
-from your own C# code.
+Then load `unity_bundle/` via the bundle picker — or copy it over
+`Assets/StreamingAssets/OpenMapBundle` to make it the startup scene.
+Coverage is added as an overlay automatically when a trajectory + sensor
+exist; every `areas` entry becomes a toggleable overlay too.
+`UnitySceneExport.Write(...)` does the same from your own C# code.
 
-## Load it in Unity
+**Real imagery**: drop a PNG/JPG of the region next to `manifest.json` and
+set its name as `"orthoFile"` in the manifest — it is draped over the
+terrain instead of the hillshaded height gradient.
 
-Either way works:
+## What's in a bundle
 
-- **Menu**: `OpenMap → Create Scene Loader...`, pick the bundle folder,
-  press Play.
-- **Manual**: empty GameObject → add the `OpenMapSceneLoader` component →
-  set *Bundle Path* (or copy the bundle to
-  `Assets/StreamingAssets/OpenMapBundle` and leave the path empty) → Play.
+| File | Content |
+|---|---|
+| `manifest.json` | anchor georeference, terrain metadata, overlay list, sensor spec |
+| `terrain_heights.r32` | raw little-endian float32 heightmap, row 0 = north |
+| `overlay_*.png` | grayscale masks (255 = inside), one per overlay |
+| `trajectory.json` | ENU samples with Euler + optional quaternion attitude |
+| `points.json` | render-target points, pre-converted Unity coordinates |
 
-Everything else — terrain mesh, camera, light, aircraft, HUD — is created at
-runtime.
+## Using the scripts in your own project
 
-## What you get at Play
-
-- **Terrain**: hillshaded height-gradient mesh (with collider). Drop a
-  georeferenced PNG/JPG next to the manifest and set `"orthoFile"` in
-  `manifest.json` to drape real imagery instead.
-- **Playback HUD** (top left): play/pause, timeline scrubbing, speed 0.5–25x,
-  loop, follow-camera.
-- **Aircraft** flying the trajectory with true attitude (quaternions when the
-  log had them, slerp interpolation), plus the full path as a yellow line.
-- **Sensor**: live wireframe of the pyramid/cone/cylinder volume, red
-  boresight ray, and the ground hit marker — computed per frame with a
-  physics raycast against the terrain, so it reacts to scrubbing.
-- **Overlays**: coverage and area masks tinted onto the terrain, toggleable
-  in the HUD.
-- **Points**: every render-target point from `points.json` as a colored
-  marker (colors grouped by tag; boresight track red).
-
-Camera: right-drag orbit, middle-drag pan, scroll zoom, `F` frame terrain.
+Copy `Assets/OpenMap` into your project's `Assets/`. Delete
+`Scripts/OpenMapBootstrap.cs` if you don't want the viewer to auto-start,
+and add the `OpenMapSceneLoader` component manually instead (menu:
+`OpenMap → Create Scene Loader...`). The reusable pieces are deliberately
+small: `OpenMapBundle` (parsing), `OpenMapFrames` (all ENU↔Unity axis and
+quaternion conversion in one file), `FlightPlayback.SamplePose` (pose at any
+time), and `points.json` whose `unityX/Y/Z`, `unityEulerX/Y/Z` fields are
+JsonUtility-ready.
 
 ## Frame conventions (matches `docs/mapscene.md`)
 
-- 1 Unity unit = 1 meter. Scene origin = the bundle's anchor (its UTM and
-  lat/lon are in the manifest and the HUD).
-- Framework ENU (x east, y north, z up, right-handed) → Unity
-  (x east, y up, z north, left-handed): positions swap y/z, rotations map as
-  `Quaternion(-qx, -qz, -qy, qw)` / `Euler(-pitch, yaw, -roll)`.
-  All conversions live in one file: `Scripts/OpenMapBundle.cs`
-  (`OpenMapFrames`).
-
-## Using the data in your own project
-
-The viewer is deliberately thin: `OpenMapBundle` (parsing),
-`OpenMapFrames` (axis conversion) and `FlightPlayback.SamplePose` are the
-reusable pieces. To feed your own render pipeline, read `points.json` — its
-`unityX/Y/Z`, `unityEulerX/Y/Z` fields are pre-converted and JsonUtility-ready.
+- 1 Unity unit = 1 meter; scene origin = the bundle's anchor (UTM + lat/lon
+  shown in the HUD).
+- Framework ENU (x east, y north, z up, right-handed) → Unity (x east, y up,
+  z north, left-handed): positions swap y/z; rotations map as
+  `Quaternion(-qx, -qz, -qy, qw)` and `Euler(-pitch, yaw, -roll)`.
