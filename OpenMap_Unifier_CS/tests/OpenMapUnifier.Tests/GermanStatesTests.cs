@@ -14,11 +14,37 @@ namespace OpenMapUnifier.Tests;
 public class GermanStatesTests
 {
     [Fact]
-    public void Registry_ContainsAllFourteenStates()
+    public void Registry_ContainsAllSixteenStates()
     {
-        Assert.Equal(14, GermanStates.All.Count);
-        Assert.All(new[] { "nw", "he", "th", "sn", "be", "bb", "st", "mv", "hh", "hb", "sh", "bw", "rp", "sl" },
+        Assert.Equal(16, GermanStates.All.Count);
+        Assert.All(new[]
+            {
+                "by", "ni", "nw", "he", "th", "sn", "be", "bb",
+                "st", "mv", "hh", "hb", "sh", "bw", "rp", "sl",
+            },
             code => Assert.True(GermanStates.All.ContainsKey(code), $"missing state '{code}'"));
+    }
+
+    [Fact]
+    public void BayernAndNiedersachsen_AreRegularRegistryStates()
+    {
+        var by = GermanStates.Get("by");
+        Assert.Equal(32, by.UtmZone);
+        Assert.Contains("dgm1", by.Datasets.Keys);
+        Assert.Contains("dgm5", by.Datasets.Keys);
+
+        var ni = GermanStates.Get("ni");
+        Assert.Contains("dom1", ni.Datasets.Keys);
+    }
+
+    [Fact]
+    public async Task Bayern_JobsThroughRegistry_MatchBayernTileSource()
+    {
+        var jobs = await GermanStates.Get("by").JobsForAsync("dgm1",
+            new BoundingBox(729_000, 5_433_000, 730_000, 5_434_000));
+        var job = Assert.Single(jobs);
+        Assert.Equal("729_5433.tif", job.FileName);
+        Assert.Equal(2, job.Mirrors.Count); // both bayernwolke mirrors
     }
 
     [Theory]

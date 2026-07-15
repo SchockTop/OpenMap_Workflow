@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using OpenMapUnifier.Core.Proxy;
 
-namespace OpenMapUnifier.Niedersachsen;
+namespace OpenMapUnifier.Germany.Niedersachsen;
 
 public sealed record StacAsset(string Key, string Href, string? Type);
 

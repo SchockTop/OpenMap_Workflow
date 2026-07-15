@@ -4,7 +4,7 @@ using OpenMapUnifier.Core.Geodesy;
 using OpenMapUnifier.Core.Grid;
 using OpenMapUnifier.Core.Raster;
 
-namespace OpenMapUnifier.Bayern;
+namespace OpenMapUnifier.Germany.Bayern;
 
 /// <summary>
 /// Height tile resolvers for Bayern's elevation products, and factory helpers

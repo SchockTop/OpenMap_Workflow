@@ -45,13 +45,14 @@ public interface IGermanState
         IDownloader? downloader = null, ProxyManager? proxy = null);
 }
 
-/// <summary>Registry of all implemented German states (Bayern and Niedersachsen
-/// live in their own packages, everything else here).</summary>
+/// <summary>Registry of ALL 16 German states.</summary>
 public static class GermanStates
 {
     public static readonly IReadOnlyDictionary<string, IGermanState> All =
         new IGermanState[]
         {
+            new States.Bayern(),
+            new States.NiedersachsenState(),
             new States.NordrheinWestfalen(),
             new States.Hessen(),
             new States.Thueringen(),
@@ -72,6 +73,5 @@ public static class GermanStates
         All.TryGetValue(code, out var state)
             ? state
             : throw new KeyNotFoundException(
-                $"Unknown state '{code}'. Implemented here: {string.Join(", ", All.Keys)} " +
-                "(plus 'by' in OpenMapUnifier.Bayern and 'ni' in OpenMapUnifier.Niedersachsen).");
+                $"Unknown state '{code}'. Known: {string.Join(", ", All.Keys.OrderBy(k => k, StringComparer.Ordinal))}.");
 }

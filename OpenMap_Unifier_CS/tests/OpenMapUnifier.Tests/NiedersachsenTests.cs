@@ -1,4 +1,4 @@
-using OpenMapUnifier.Niedersachsen;
+using OpenMapUnifier.Germany.Niedersachsen;
 using Xunit;
 
 namespace OpenMapUnifier.Tests;

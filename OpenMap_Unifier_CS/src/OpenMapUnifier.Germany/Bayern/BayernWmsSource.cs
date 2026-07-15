@@ -5,7 +5,7 @@ using OpenMapUnifier.Core.Geodesy;
 using OpenMapUnifier.Core.Geometry;
 using OpenMapUnifier.Core.Grid;
 
-namespace OpenMapUnifier.Bayern;
+namespace OpenMapUnifier.Germany.Bayern;
 
 /// <summary>
 /// WMS GetMap job builder for Bayern's rendered layers (hillshade relief,

@@ -1,4 +1,4 @@
-using OpenMapUnifier.Bayern;
+using OpenMapUnifier.Germany.Bayern;
 using Xunit;
 
 namespace OpenMapUnifier.Tests;

@@ -5,7 +5,7 @@ using OpenMapUnifier.Core.Grid;
 using OpenMapUnifier.Core.Proxy;
 using OpenMapUnifier.Core.Raster;
 
-namespace OpenMapUnifier.Niedersachsen;
+namespace OpenMapUnifier.Germany.Niedersachsen;
 
 /// <summary>
 /// Height providers for Niedersachsen's elevation COGs. Tile URLs are

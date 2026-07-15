@@ -1,4 +1,4 @@
-using OpenMapUnifier.Bayern;
+using OpenMapUnifier.Germany.Bayern;
 using OpenMapUnifier.Core.Geodesy;
 using OpenMapUnifier.Core.Grid;
 using Xunit;

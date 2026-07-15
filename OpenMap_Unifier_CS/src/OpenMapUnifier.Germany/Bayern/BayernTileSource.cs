@@ -4,7 +4,7 @@ using OpenMapUnifier.Core.Geodesy;
 using OpenMapUnifier.Core.Geometry;
 using OpenMapUnifier.Core.Grid;
 
-namespace OpenMapUnifier.Bayern;
+namespace OpenMapUnifier.Germany.Bayern;
 
 /// <summary>
 /// Turns an area of interest into download jobs for a Bayern raw dataset —

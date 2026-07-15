@@ -1,7 +1,7 @@
 using System.Xml.Linq;
 using OpenMapUnifier.Core.Downloading;
 
-namespace OpenMapUnifier.Bayern;
+namespace OpenMapUnifier.Germany.Bayern;
 
 /// <summary>
 /// Parser for .meta4 metalink files as served by geodaten.bayern.de (e.g. the

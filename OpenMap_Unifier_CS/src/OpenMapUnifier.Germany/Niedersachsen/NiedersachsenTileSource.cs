@@ -3,7 +3,7 @@ using OpenMapUnifier.Core.Geodesy;
 using OpenMapUnifier.Core.Geometry;
 using OpenMapUnifier.Core.Grid;
 
-namespace OpenMapUnifier.Niedersachsen;
+namespace OpenMapUnifier.Germany.Niedersachsen;
 
 /// <summary>
 /// Turns an area of interest into download jobs for an LGLN dataset by

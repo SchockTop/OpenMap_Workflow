@@ -1,6 +1,5 @@
 using System.Globalization;
-using OpenMapUnifier.Bayern;
-using OpenMapUnifier.Core.Catalog;
+using OpenMapUnifier.Germany.Bayern;
 using OpenMapUnifier.Core.Downloading;
 using OpenMapUnifier.Core.Elevation;
 using OpenMapUnifier.Core.Geodesy;
@@ -8,7 +7,6 @@ using OpenMapUnifier.Core.Grid;
 using OpenMapUnifier.Core.Proxy;
 using OpenMapUnifier.Core.Raster;
 using OpenMapUnifier.Germany;
-using OpenMapUnifier.Niedersachsen;
 
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "help";
 try
@@ -94,30 +92,15 @@ static int Datasets(string[] args)
 {
     if (GetOption(args, "--state") is { } code)
     {
-        if (code.Equals("by", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var d in BayernCatalog.Instance.Datasets.Values)
-                Console.WriteLine($"  {d.Id,-12} [{d.Category}] {d.Label}");
-        }
-        else if (code.Equals("ni", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var d in NiedersachsenCatalog.Datasets.Values)
-                Console.WriteLine($"  {d.Id,-12} [{d.Category}] {d.Label}");
-        }
-        else
-        {
-            var state = GermanStates.Get(code);
-            Console.WriteLine($"{state.Name} — EPSG:258{state.UtmZone} — {state.License} — {state.Attribution}");
-            foreach (var (id, description) in state.Datasets)
-                Console.WriteLine($"  {id,-12} {description}");
-        }
+        var state = GermanStates.Get(code);
+        Console.WriteLine($"{state.Name} — EPSG:258{state.UtmZone} — {state.License} — {state.Attribution}");
+        foreach (var (id, description) in state.Datasets)
+            Console.WriteLine($"  {id,-12} {description}");
         return 0;
     }
 
-    Console.WriteLine("by  Bayern             — CC BY 4.0        (dgm1, dgm5, dom20, dop20/40, lod2, laser, WMS)");
-    Console.WriteLine("ni  Niedersachsen      — CC BY 4.0        (dgm1, dom1, dop20rgb/rgbi via STAC)");
     foreach (var state in GermanStates.All.Values.OrderBy(s => s.Code, StringComparer.Ordinal))
-        Console.WriteLine($"{state.Code,-3} {state.Name,-18} — {state.License,-16} ({string.Join(", ", state.Datasets.Keys)})");
+        Console.WriteLine($"{state.Code,-3} {state.Name,-22} — {state.License,-16} ({string.Join(", ", state.Datasets.Keys)})");
     Console.WriteLine();
     Console.WriteLine("Details per state: openmap datasets --state CODE");
     return 0;
@@ -135,30 +118,8 @@ static async Task<int> Tiles(string[] args)
     return 0;
 }
 
-static async Task<IReadOnlyList<DownloadJob>> ResolveJobs(string[] args, string dataset, BoundingBox bbox)
-{
-    var code = StateCode(args);
-    switch (code)
-    {
-        case "by":
-            var info = BayernCatalog.Instance[dataset];
-            return (info.Kind == DatasetKind.Wms
-                ? new BayernWmsSource().JobsFor(dataset, bbox)
-                : new BayernTileSource().JobsFor(dataset, bbox)).ToList();
-        case "ni":
-            using (var source = new NiedersachsenTileSource(new StacClient(proxy: ParseProxy(args))))
-                return await source.JobsForAsync(dataset, bbox);
-        default:
-            return await GermanStates.Get(code).JobsForAsync(dataset, bbox);
-    }
-}
-
-static string AttributionFor(string code) => code switch
-{
-    "by" => BayernCatalog.Attribution,
-    "ni" => NiedersachsenCatalog.Attribution,
-    _ => GermanStates.Get(code).Attribution,
-};
+static async Task<IReadOnlyList<DownloadJob>> ResolveJobs(string[] args, string dataset, BoundingBox bbox) =>
+    await GermanStates.Get(StateCode(args)).JobsForAsync(dataset, bbox);
 
 static async Task<int> Download(string[] args)
 {
@@ -170,9 +131,10 @@ static async Task<int> Download(string[] args)
     var proxy = ParseProxy(args);
 
     var jobs = await ResolveJobs(args, dataset, bbox);
-    var code = StateCode(args);
-    var attribution = AttributionFor(code);
-    double? pixelSize = code == "by" ? BayernCatalog.Instance[dataset].PixelSizeMeters : null;
+    var state = GermanStates.Get(StateCode(args));
+    // Sidecars only make sense for Bayern's grid-named GeoTIFFs (every other
+    // state's rasters carry internal georeferencing).
+    double? pixelSize = state.Code == "by" ? BayernCatalog.Instance[dataset].PixelSizeMeters : null;
 
     Console.WriteLine($"Downloading {jobs.Count} {dataset} files to {outDir} ...");
     using var downloader = new HttpTileDownloader(new DownloaderOptions { MaxParallel = parallel, Proxy = proxy });
@@ -192,7 +154,7 @@ static async Task<int> Download(string[] args)
             WorldFile.WriteSidecarsForBayernTile(r.LocalPath!, px);
 
     Console.WriteLine($"{ok}/{results.Count} tiles OK.");
-    Console.WriteLine(attribution);
+    Console.WriteLine(state.Attribution);
     return ok == results.Count ? 0 : 1;
 }
 
@@ -369,27 +331,15 @@ static async Task<int> ProxyTest(string[] args)
 static TiledElevationProvider CreateProvider(string code, string dataset, string cache, ProxyManager? proxy)
 {
     var downloader = new HttpTileDownloader(new DownloaderOptions { Proxy = proxy });
-    return (code, dataset.ToLowerInvariant()) switch
-    {
-        ("ni", "dgm1") => NiedersachsenElevation.CreateDgm1Provider(cache, downloader, proxy),
-        ("ni", "dom1") => NiedersachsenElevation.CreateDom1Provider(cache, downloader, proxy),
-        ("by", "dgm1") => BayernElevation.CreateDgm1Provider(cache, downloader),
-        ("by", "dgm5") => BayernElevation.CreateDgm5Provider(cache, downloader),
-        ("by", "dom20") => BayernElevation.CreateDom20Provider(cache, downloader),
-        ("by" or "ni", _) => throw new ArgumentException(
-            $"'{dataset}' is not an elevation dataset for '{code}' (by: dgm1/dgm5/dom20, ni: dgm1/dom1)."),
-        _ => GermanStates.Get(code).CreateElevationProvider(dataset, cache, downloader, proxy),
-    };
+    return GermanStates.Get(code).CreateElevationProvider(dataset, cache, downloader, proxy);
 }
 
 static string StateCode(string[] args)
 {
     var code = (GetOption(args, "--state") ?? "by").ToLowerInvariant();
-    if (code is "bayern") code = "by";
-    if (code is "niedersachsen") code = "ni";
-    if (code is not ("by" or "ni") && !GermanStates.All.ContainsKey(code))
+    if (!GermanStates.All.ContainsKey(code))
         throw new ArgumentException(
-            $"Unknown state '{code}'. Known: by, ni, {string.Join(", ", GermanStates.All.Keys.OrderBy(k => k, StringComparer.Ordinal))}.");
+            $"Unknown state '{code}'. Known: {string.Join(", ", GermanStates.All.Keys.OrderBy(k => k, StringComparer.Ordinal))}.");
     return code;
 }
 

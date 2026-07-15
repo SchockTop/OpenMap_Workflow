@@ -1,6 +1,6 @@
 using OpenMapUnifier.Core.Catalog;
 
-namespace OpenMapUnifier.Bayern;
+namespace OpenMapUnifier.Germany.Bayern;
 
 /// <summary>
 /// Bayern OpenData dataset catalog — a 1:1 port of BAYERN_DATASETS from the

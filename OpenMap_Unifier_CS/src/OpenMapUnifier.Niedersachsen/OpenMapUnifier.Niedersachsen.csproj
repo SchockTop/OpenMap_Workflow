@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <RootNamespace>OpenMapUnifier.Niedersachsen</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../OpenMapUnifier.Core/OpenMapUnifier.Core.csproj" />
-  </ItemGroup>
-</Project>

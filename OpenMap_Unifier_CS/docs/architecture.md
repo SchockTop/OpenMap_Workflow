@@ -3,17 +3,22 @@
 ## Projects
 
 ```
-OpenMapUnifier.Core           zero-dependency framework: geodesy, grid math, geometry,
-                              downloading (incl. remote-zip), proxy, raster readers,
-                              elevation engine, chaotic-JSON import
-OpenMapUnifier.Bayern         Bayern LDBV (static bayernwolke URLs, WMS, metalink)
-OpenMapUnifier.Niedersachsen  LGLN (STAC APIs -> S3 COGs)
-OpenMapUnifier.Germany        the other 14 states behind IGermanState
-OpenMapUnifier.Cli            `openmap` command-line front end
-OpenMapUnifier.Tests          offline xUnit suite (no network)
+OpenMapUnifier.Core      zero-dependency framework: geodesy, grid math, geometry,
+                         downloading (incl. remote-zip), proxy, raster readers,
+                         elevation engine, chaotic-JSON import
+OpenMapUnifier.Germany   ALL 16 states behind IGermanState (registry: GermanStates).
+                         Subnamespaces Germany.Bayern / Germany.Niedersachsen hold
+                         those states' extra machinery (WMS renders, metalink
+                         parsing, the STAC client) — usable directly when you need
+                         more than the uniform interface.
+OpenMapUnifier.Cli       `openmap` command-line front end
+OpenMapUnifier.Tests     offline xUnit suite (no network)
 ```
 
-Dependency rule: state packages depend on Core only; Core knows no agency.
+Dependency rule: Germany depends on Core only; Core knows no agency.
+(History note: Bayern and Niedersachsen started as separate packages before
+the IGermanState registry existed; they were folded in once all 16 states
+were implemented, so there is exactly ONE way to reach any state.)
 
 ## The seams (swap any of these independently)
 

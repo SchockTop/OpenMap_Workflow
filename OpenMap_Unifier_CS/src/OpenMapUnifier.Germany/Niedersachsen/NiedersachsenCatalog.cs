@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace OpenMapUnifier.Niedersachsen;
+namespace OpenMapUnifier.Germany.Niedersachsen;
 
 /// <summary>
 /// One LGLN OpenGeoData dataset, resolved through its STAC API. Verified live
